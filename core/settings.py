@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -23,9 +24,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-ii4!z8d%)ie)un4e-_js6o))f6ubt@1+%he5!&2ud+58$#c3n!"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "True") == "True"
 
-ALLOWED_HOSTS = ["*"]
+# Allow Railway-injected domain + localhost
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
 # Application definition
 
@@ -41,6 +43,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Serve static files in production
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -71,33 +74,32 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 
-# Database Configuration - Dynamic cPanel MySQL or SQLite Fallback
+# Database Configuration - Priority: env vars > db_config.json > SQLite fallback
 import json
 import pymysql
 import django.db.backends.base.base
 
-# Bypass MySQL 8 version check for Bluehost cPanel MySQL 5.7
+# Bypass MySQL 8 version check for cPanel MySQL 5.7
 django.db.backends.base.base.BaseDatabaseWrapper.check_database_version_supported = lambda self: None
 pymysql.install_as_MySQLdb()
 
-CONFIG_FILE = BASE_DIR / "db_config.json"
-db_cfg = {}
-if CONFIG_FILE.exists():
-    try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            db_cfg = json.load(f)
-    except Exception:
-        db_cfg = {}
+# Railway / production: set DB_ env vars in the Railway Variables dashboard
+_db_host = os.environ.get("DB_HOST", "")
+_db_name = os.environ.get("DB_NAME", "")
+_db_user = os.environ.get("DB_USER", "")
+_db_password = os.environ.get("DB_PASSWORD", "")
+_db_port = os.environ.get("DB_PORT", "3306")
 
-if db_cfg.get("ENGINE") == "mysql" and db_cfg.get("HOST") and db_cfg.get("NAME"):
+if _db_host and _db_name:
+    # Use env-var-supplied MySQL credentials (Railway production)
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.mysql",
-            "NAME": db_cfg.get("NAME"),
-            "USER": db_cfg.get("USER", ""),
-            "PASSWORD": db_cfg.get("PASSWORD", ""),
-            "HOST": db_cfg.get("HOST", "127.0.0.1"),
-            "PORT": str(db_cfg.get("PORT", "3306")),
+            "NAME": _db_name,
+            "USER": _db_user,
+            "PASSWORD": _db_password,
+            "HOST": _db_host,
+            "PORT": _db_port,
             "OPTIONS": {
                 "charset": "utf8mb4",
                 "connect_timeout": 6,
@@ -105,12 +107,38 @@ if db_cfg.get("ENGINE") == "mysql" and db_cfg.get("HOST") and db_cfg.get("NAME")
         }
     }
 else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+    # Local dev: fall back to db_config.json then SQLite
+    CONFIG_FILE = BASE_DIR / "db_config.json"
+    db_cfg = {}
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                db_cfg = json.load(f)
+        except Exception:
+            db_cfg = {}
+
+    if db_cfg.get("ENGINE") == "mysql" and db_cfg.get("HOST") and db_cfg.get("NAME"):
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.mysql",
+                "NAME": db_cfg.get("NAME"),
+                "USER": db_cfg.get("USER", ""),
+                "PASSWORD": db_cfg.get("PASSWORD", ""),
+                "HOST": db_cfg.get("HOST", "127.0.0.1"),
+                "PORT": str(db_cfg.get("PORT", "3306")),
+                "OPTIONS": {
+                    "charset": "utf8mb4",
+                    "connect_timeout": 6,
+                },
+            }
         }
-    }
+    else:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": BASE_DIR / "db.sqlite3",
+            }
+        }
 
 
 
@@ -150,6 +178,8 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"  # Required for collectstatic in production
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
