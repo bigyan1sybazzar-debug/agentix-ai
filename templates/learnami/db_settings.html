@@ -1,0 +1,117 @@
+{% extends "learnami/base.html" %}
+{% block title %}Database Setup | Learnami{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Database Setup</h1>
+<p class="page-sub">Connect your cPanel MySQL database. App falls back to SQLite until configured.</p>
+
+<div class="two-col">
+
+  <!-- Credentials Form -->
+  <div class="card">
+    <div class="card-title">cPanel MySQL Credentials</div>
+
+    {% if test_result %}
+      <div class="result-box {% if test_result.success %}ok{% else %}fail{% endif %}">
+        {% if test_result.success %}✓ Connected — {{ test_result.server_info }}{% else %}✗ {{ test_result.message }}{% endif %}
+      </div>
+    {% endif %}
+
+    <form method="post" style="margin-top:0.75rem;">
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label class="form-label">Host / IP</label>
+        <input type="text" name="host" class="form-control" placeholder="yourdomain.com or server IP" value="{{ cfg.HOST|default:'' }}">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Port</label>
+          <input type="text" name="port" class="form-control" value="{{ cfg.PORT|default:'3306' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Database Name</label>
+          <input type="text" name="name" class="form-control" placeholder="cpaneluser_db" value="{{ cfg.NAME|default:'' }}">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" name="user" class="form-control" placeholder="cpaneluser_dbuser" value="{{ cfg.USER|default:'' }}">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" value="{{ cfg.PASSWORD|default:'' }}">
+      </div>
+
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <button type="submit" name="action" value="test" class="btn btn-secondary">Test Connection</button>
+        <button type="submit" name="action" value="save_mysql" class="btn btn-primary">Save &amp; Use MySQL</button>
+        {% if db_status.is_mysql %}
+          <button type="submit" name="action" value="switch_sqlite" class="btn btn-danger">Revert to SQLite</button>
+        {% endif %}
+      </div>
+    </form>
+
+    <!-- Auto Migrate -->
+    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit" name="action" value="auto_migrate" class="btn btn-secondary btn-full">
+          Sync / Auto-Migrate All Tables
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Status Panel -->
+  <div>
+    <div class="card">
+      <div class="card-title">Active Connection</div>
+      <table>
+        <tr>
+          <td style="color:var(--muted);">Engine</td>
+          <td><strong>{{ db_status.engine|upper }}</strong></td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Database</td>
+          <td>{{ db_status.db_name }}</td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Host</td>
+          <td>{{ db_status.host }}</td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Tables</td>
+          <td>{{ db_status.tables_count }} managed</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">cPanel Setup Steps</div>
+      <ol style="padding-left:1.1rem; color:var(--muted); font-size:0.82rem; line-height:1.8;">
+        <li>Login to cPanel → <strong>Remote MySQL</strong></li>
+        <li>Add your current IP address</li>
+        <li>Go to <strong>MySQL Databases</strong> → assign user ALL PRIVILEGES</li>
+        <li>Enter credentials here → Test → Save</li>
+        <li>Click <strong>Sync Tables</strong> to auto-migrate</li>
+      </ol>
+    </div>
+
+    {% if db_status.tables %}
+    <div class="card">
+      <div class="card-title">Active Tables</div>
+      <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+        {% for t in db_status.tables %}
+          <span class="badge badge-blue" style="font-family:monospace;">{{ t }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

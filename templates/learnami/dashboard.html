@@ -1,0 +1,124 @@
+{% extends "learnami/base.html" %}
+
+{% block title %}Dashboard | Learnami{% endblock %}
+
+{% block content %}
+
+<h1 class="page-title">Dashboard</h1>
+<p class="page-sub">System overview across all automation layers.</p>
+
+<!-- Stats Row -->
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="stat-label">Users</div>
+    <div class="stat-value">{{ users_count }}</div>
+    <div class="stat-sub">{{ trusted_users }} trusted</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Mod Queue</div>
+    <div class="stat-value">{{ pending_mod }}</div>
+    <div class="stat-sub">{{ subs_count }} total submissions</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Identity Links</div>
+    <div class="stat-value">{{ identities_count }}</div>
+    <div class="stat-sub">{{ confirmed_identities }} confirmed</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Vector Docs</div>
+    <div class="stat-value">{{ documents_count }}</div>
+    <div class="stat-sub">{{ embedded_docs }} embedded</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Media Assets</div>
+    <div class="stat-value">{{ media_count }}</div>
+    <div class="stat-sub">{{ approved_media }} approved</div>
+  </div>
+</div>
+
+<!-- Layer Shortcuts -->
+<div class="card">
+  <div class="card-title">Agent Layers</div>
+  <div class="module-grid">
+    <a href="{% url 'onboarding' %}" class="module-card">
+      <div class="module-info">
+        <strong>Onboarding</strong>
+        <span>Registration evaluation &amp; progressive asks</span>
+      </div>
+      <span class="module-arrow">›</span>
+    </a>
+    <a href="{% url 'moderation' %}" class="module-card">
+      <div class="module-info">
+        <strong>Moderation</strong>
+        <span>Content checks &amp; moderation queue</span>
+      </div>
+      <span class="module-arrow">›</span>
+    </a>
+    <a href="{% url 'governance' %}" class="module-card">
+      <div class="module-info">
+        <strong>Governance</strong>
+        <span>Policy sandbox &amp; shared audit log</span>
+      </div>
+      <span class="module-arrow">›</span>
+    </a>
+    <a href="{% url 'identity_workbench' %}" class="module-card">
+      <div class="module-info">
+        <strong>Identity Resolution</strong>
+        <span>Cross-site user linking &amp; scoring</span>
+      </div>
+      <span class="module-arrow">›</span>
+    </a>
+    <a href="{% url 'retrieval_workbench' %}" class="module-card">
+      <div class="module-info">
+        <strong>Vector Memory RAG</strong>
+        <span>Semantic search on indexed docs</span>
+      </div>
+      <span class="module-arrow">›</span>
+    </a>
+    <a href="{% url 'media_assistant' %}" class="module-card">
+      <div class="module-info">
+        <strong>Media Assistant</strong>
+        <span>Asset validation &amp; WP packaging</span>
+      </div>
+      <span class="module-arrow">›</span>
+    </a>
+  </div>
+</div>
+
+<!-- Recent Automation Logs -->
+<div class="card">
+  <div class="card-row">
+    <div class="card-title" style="margin-bottom:0;">Recent Automation Runs</div>
+    <a href="{% url 'run_automation' %}" class="btn btn-primary btn-sm">⚡ Run Now</a>
+  </div>
+  <br>
+
+  {% if recent_logs %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Pipeline</th>
+            <th>Items</th>
+            <th>Summary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in recent_logs %}
+            <tr>
+              <td style="white-space:nowrap; font-family:monospace;">{{ log.created_at|date:"m/d H:i" }}</td>
+              <td>{{ log.pipeline_name }}</td>
+              <td><span class="badge badge-blue">{{ log.items_processed }}</span></td>
+              <td>{{ log.summary|truncatechars:80 }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty">No automation runs yet. Click ⚡ Run Now to start.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "learnami/base.html" %}
+{% block title %}Governance | Learnami{% endblock %}
+{% block content %}
+
+<h1 class="page-title">Governance</h1>
+<p class="page-sub">Policy sandbox, audit log, and shared governance layer.</p>
+
+<div class="stats-row" style="grid-template-columns:repeat(3,1fr);">
+  <div class="stat-box">
+    <div class="stat-label">Audit Events</div>
+    <div class="stat-value">{{ audit_count }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Active Policies</div>
+    <div class="stat-value">{{ policy_count }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Violations (24h)</div>
+    <div class="stat-value">{{ violations_24h }}</div>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- Log Governance Event -->
+  <div class="card">
+    <div class="card-title">Log Governance Event</div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="log_governance">
+      <div class="form-group">
+        <label class="form-label">Event Type</label>
+        <select name="event_type" class="form-control">
+          <option value="policy_applied">Policy Applied</option>
+          <option value="policy_violation">Policy Violation</option>
+          <option value="role_change">Role Change</option>
+          <option value="flag_escalated">Flag Escalated</option>
+          <option value="manual_override">Manual Override</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Entity Type</label>
+        <select name="entity_type" class="form-control">
+          <option value="user">User</option>
+          <option value="content">Content</option>
+          <option value="media">Media</option>
+          <option value="identity">Identity</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Entity ID</label>
+        <input type="number" name="entity_id" class="form-control" value="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Details</label>
+        <textarea name="details" class="form-control" placeholder="Event details or reason..."></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Log Event</button>
+    </form>
+
+    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="run_governance_batch">
+        <button type="submit" class="btn btn-secondary btn-full">⚡ Run Governance Batch</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Audit Log Table -->
+  <div class="card">
+    <div class="card-title">Recent Audit Log</div>
+    {% if audit_logs %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Event</th><th>Entity</th><th>Severity</th></tr>
+        </thead>
+        <tbody>
+          {% for log in audit_logs %}
+          <tr>
+            <td style="white-space:nowrap; font-family:monospace; font-size:0.72rem">{{ log.created_at|date:"m/d H:i" }}</td>
+            <td><span class="badge badge-blue" style="font-size:0.7rem">{{ log.event_type }}</span></td>
+            <td style="font-size:0.78rem">{{ log.entity_type }} #{{ log.entity_id }}</td>
+            <td>
+              <span class="badge badge-{% if log.severity == 'critical' %}red{% elif log.severity == 'high' %}amber{% elif log.severity == 'medium' %}blue{% else %}green{% endif %}">
+                {{ log.severity }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">No governance events logged yet.</div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

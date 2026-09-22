@@ -1,0 +1,119 @@
+{% extends "learnami/base.html" %}
+{% block title %}Media Assistant | Learnami{% endblock %}
+{% block content %}
+
+<h1 class="page-title">Media Assistant</h1>
+<p class="page-sub">Validate, score, and package media assets for WordPress delivery.</p>
+
+<div class="stats-row" style="grid-template-columns:repeat(4,1fr);">
+  <div class="stat-box">
+    <div class="stat-label">Total Assets</div>
+    <div class="stat-value">{{ total_media }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Approved</div>
+    <div class="stat-value">{{ approved_count }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Pending</div>
+    <div class="stat-value">{{ pending_count }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Rejected</div>
+    <div class="stat-value">{{ rejected_count }}</div>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- Add Media Form -->
+  <div class="card">
+    <div class="card-row">
+      <div class="card-title" style="margin-bottom:0">Add Media Candidate</div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="run_media_batch">
+        <button type="submit" class="btn btn-secondary btn-sm">⚡ Evaluate All</button>
+      </form>
+    </div>
+    <br>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add_media">
+      <div class="form-group">
+        <label class="form-label">File Name</label>
+        <input type="text" name="file_name" class="form-control" placeholder="image.jpg">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Media Type</label>
+          <select name="media_type" class="form-control">
+            <option value="image">Image</option>
+            <option value="video">Video</option>
+            <option value="audio">Audio</option>
+            <option value="document">Document</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">File Size (KB)</label>
+          <input type="number" name="file_size_kb" class="form-control" value="1024">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Source URL</label>
+        <input type="url" name="source_url" class="form-control" placeholder="https://...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Alt Text</label>
+        <input type="text" name="alt_text" class="form-control" placeholder="Describe the media">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Context / Topic</label>
+        <input type="text" name="context" class="form-control" placeholder="Topic or article context">
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Add &amp; Evaluate</button>
+    </form>
+  </div>
+
+  <!-- Media Table -->
+  <div class="card">
+    <div class="card-title">Media Queue</div>
+    {% if media_items %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>File</th><th>Type</th><th>Score</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for item in media_items %}
+          <tr>
+            <td style="font-size:0.8rem; color:#fff">{{ item.file_name|truncatechars:22 }}</td>
+            <td><span class="badge badge-blue">{{ item.media_type }}</span></td>
+            <td>
+              <span class="badge badge-{% if item.quality_score > 0.7 %}green{% elif item.quality_score > 0.4 %}amber{% else %}red{% endif %}">
+                {{ item.quality_score|floatformat:2 }}
+              </span>
+            </td>
+            <td><span class="badge badge-{{ item.approval_status }}">{{ item.approval_status }}</span></td>
+            <td>
+              <form method="post" style="display:flex; gap:0.3rem;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="approve_media">
+                <input type="hidden" name="media_id" value="{{ item.id }}">
+                <button name="decision" value="approved" class="btn btn-success btn-sm">✓</button>
+                <button name="decision" value="rejected" class="btn btn-danger btn-sm">✗</button>
+                <button name="decision" value="review_required" class="btn btn-secondary btn-sm">?</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">No media assets yet. Add one above.</div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

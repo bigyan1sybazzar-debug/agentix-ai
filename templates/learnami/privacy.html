@@ -1,0 +1,146 @@
+{% extends "learnami/base.html" %}
+
+{% block title %}Privacy Boundaries & Consent | Learnami{% endblock %}
+
+{% block content %}
+<div class="header-banner">
+  <div>
+    <h2 style="margin:0; font-size:1.4rem;">🛡️ Privacy Boundaries & Scope Rules</h2>
+    <p style="margin:0.25rem 0 0 0; font-size:0.85rem; opacity:0.85;">
+      Enforces requester role permissions, data class masking, and user consent for cross-site memory sharing.
+    </p>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:1.5rem;">
+  <div class="card">
+    <h3 style="margin-top:0;">Evaluate Privacy Data Access</h3>
+    <form method="POST">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="access_check">
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Requester Role</label>
+        <select name="requester_role" class="form-control" style="width:100%; padding:0.5rem; background:var(--bg-dark); color:white; border:1px solid var(--border); border-radius:6px;">
+          <option value="user_facing_admin_agent">User-Facing Admin Agent</option>
+          <option value="governance_admin_agent">Governance Admin Agent</option>
+          <option value="chief_of_staff">Chief of Staff</option>
+          <option value="operational_agent">Operational Agent</option>
+          <option value="guest">Guest / Unauthenticated</option>
+        </select>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Data Class</label>
+        <select name="data_class" class="form-control" style="width:100%; padding:0.5rem; background:var(--bg-dark); color:white; border:1px solid var(--border); border-radius:6px;">
+          <option value="cross_site_memory">Cross-Site User Memory</option>
+          <option value="identity_links">Identity Candidate Links</option>
+          <option value="user_pii">User PII & Bio</option>
+          <option value="moderation_history">Moderation Audit Logs</option>
+        </select>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Target User Key</label>
+        <input type="text" name="target_key" value="global_user_9921" class="form-control" style="width:100%; padding:0.5rem; background:var(--bg-dark); color:white; border:1px solid var(--border); border-radius:6px;">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Evaluate Scope Access</button>
+    </form>
+
+    {% if check_result %}
+    <div style="margin-top:1rem; padding:0.75rem; background:rgba(0,0,0,0.3); border-radius:6px;">
+      <span class="badge badge-{% if check_result.decision == 'allowed' %}approved{% elif check_result.decision == 'masked' %}pending{% else %}rejected{% endif %}">
+        Decision: {{ check_result.decision|upper }}
+      </span>
+      <p style="font-size:0.85rem; margin:0.5rem 0 0 0;">{{ check_result.reason }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Record User Consent</h3>
+    <form method="POST">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="grant_consent">
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Global User Key</label>
+        <input type="text" name="global_user_key" value="global_user_9921" class="form-control" style="width:100%; padding:0.5rem; background:var(--bg-dark); color:white; border:1px solid var(--border); border-radius:6px;">
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Consent Type</label>
+        <select name="consent_type" class="form-control" style="width:100%; padding:0.5rem; background:var(--bg-dark); color:white; border:1px solid var(--border); border-radius:6px;">
+          <option value="cross_site_memory">Cross-Site User Memory</option>
+          <option value="data_sharing">Third-Party Data Sharing</option>
+        </select>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Consent Choice</label>
+        <select name="granted" class="form-control" style="width:100%; padding:0.5rem; background:var(--bg-dark); color:white; border:1px solid var(--border); border-radius:6px;">
+          <option value="true">Granted (Allow)</option>
+          <option value="false">Denied (Opt-Out)</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-secondary" style="width:100%;">Save Consent Record</button>
+    </form>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:1.5rem;">
+  <div class="card">
+    <h3 style="margin-top:0;">Recent Access Evaluation Logs</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Data Class</th>
+          <th>Decision</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in access_logs %}
+        <tr>
+          <td><code>{{ log.requester_role }}</code></td>
+          <td>{{ log.data_class }}</td>
+          <td>
+            <span class="badge badge-{% if log.decision == 'allowed' %}approved{% elif log.decision == 'masked' %}pending{% else %}rejected{% endif %}">
+              {{ log.decision }}
+            </span>
+          </td>
+          <td style="font-size:0.75rem;">{{ log.reason|truncatechars:40 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" style="text-align:center;">No access logs recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Active User Consent Records</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>User Key</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Source SFP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in consent_records %}
+        <tr>
+          <td><code>{{ c.global_user_key }}</code></td>
+          <td>{{ c.consent_type }}</td>
+          <td>
+            <span class="badge badge-{% if c.granted %}approved{% else %}rejected{% endif %}">
+              {% if c.granted %}GRANTED{% else %}DENIED{% endif %}
+            </span>
+          </td>
+          <td>{{ c.source_sfp }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" style="text-align:center;">No consent records found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

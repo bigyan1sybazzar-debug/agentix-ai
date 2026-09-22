@@ -1,0 +1,99 @@
+{% extends "learnami/base.html" %}
+
+{% block title %}Policy Registry & SFPs | Learnami{% endblock %}
+
+{% block content %}
+<div class="header-banner">
+  <div>
+    <h2 style="margin:0; font-size:1.4rem;">⚙️ Policy Registry & SFP Capability Packs</h2>
+    <p style="margin:0.25rem 0 0 0; font-size:0.85rem; opacity:0.85;">
+      Manages DB-driven policy rules, SFP capability packs, event orchestration rules, and sandbox policy simulations.
+    </p>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:1.5rem;">
+  <div class="card">
+    <h3 style="margin-top:0;">Single Feature Platform (SFP) Registry</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Key</th>
+          <th>Name</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sfp in sfps %}
+        <tr>
+          <td><code>{{ sfp.sfp_key }}</code></td>
+          <td>{{ sfp.sfp_name }}</td>
+          <td><span class="badge badge-approved">{{ sfp.status|upper }}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" style="text-align:center;">No SFPs registered.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Sandbox Policy Simulation Sandbox</h3>
+    <form method="POST">
+      {% csrf_token %}
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Select Policy Rule</label>
+        <select name="policy_key" class="form-control" style="width:100%; padding:0.5rem; background:var(--bg-dark); color:white; border:1px solid var(--border); border-radius:6px;">
+          {% for p in policies %}
+          <option value="{{ p.policy_key }}">{{ p.policy_key }} ({{ p.policy_type }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.35rem;">Simulation Name</label>
+        <input type="text" name="simulation_name" value="sandbox_test_run" class="form-control" style="width:100%; padding:0.5rem; background:var(--bg-dark); color:white; border:1px solid var(--border); border-radius:6px;">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Run Policy Simulation</button>
+    </form>
+
+    {% if sim_result %}
+    <div style="margin-top:1rem; padding:0.75rem; background:rgba(0,0,0,0.3); border-radius:6px;">
+      <span class="badge badge-{% if sim_result.passed %}approved{% else %}rejected{% endif %}">
+        Simulation Passed: {{ sim_result.passed }}
+      </span>
+      <pre style="font-size:0.75rem; margin-top:0.5rem; white-space:pre-wrap;">{{ sim_result.summary }}</pre>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+  <h3 style="margin-top:0;">Registered Policy Rules</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Policy Key</th>
+        <th>Type</th>
+        <th>Context</th>
+        <th>Action</th>
+        <th>Priority</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in policies %}
+      <tr>
+        <td><code>{{ p.policy_key }}</code></td>
+        <td>{{ p.policy_type }}</td>
+        <td>{{ p.platform_context }}</td>
+        <td>{{ p.action_type }}</td>
+        <td>{{ p.priority }}</td>
+        <td><span class="badge badge-{% if p.enabled %}approved{% else %}rejected{% endif %}">{% if p.enabled %}ENABLED{% else %}DISABLED{% endif %}</span></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center;">No policy rules defined.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

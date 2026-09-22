@@ -1,0 +1,123 @@
+{% extends "learnami/base.html" %}
+{% block title %}Vector Memory (RAG) | Learnami{% endblock %}
+{% block content %}
+
+<h1 class="page-title">Vector Memory / RAG</h1>
+<p class="page-sub">Index documents and run semantic retrieval queries against agent memory.</p>
+
+<div class="stats-row" style="grid-template-columns:repeat(3,1fr);">
+  <div class="stat-box">
+    <div class="stat-label">Documents</div>
+    <div class="stat-value">{{ total_docs }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Embedded</div>
+    <div class="stat-value">{{ embedded_count }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Pending</div>
+    <div class="stat-value">{{ pending_count }}</div>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- Index + Query Card -->
+  <div class="card">
+    <!-- Index Form -->
+    <div class="card-row">
+      <div class="card-title" style="margin-bottom:0">Index Document</div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="run_embedding_batch">
+        <button type="submit" class="btn btn-secondary btn-sm">⚡ Embed All</button>
+      </form>
+    </div>
+    <br>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="index_document">
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input type="text" name="title" class="form-control" placeholder="Document title">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Content</label>
+        <textarea name="content" class="form-control" placeholder="Paste content to index..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Source</label>
+          <input type="text" name="source_url" class="form-control" placeholder="https://...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Doc Type</label>
+          <select name="doc_type" class="form-control">
+            <option value="article">Article</option>
+            <option value="policy">Policy</option>
+            <option value="user_memory">User Memory</option>
+            <option value="course">Course</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Index Document</button>
+    </form>
+
+    <!-- Divider -->
+    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+      <div class="card-title">Semantic Query</div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="rag_query">
+        <div class="form-group">
+          <label class="form-label">Query</label>
+          <input type="text" name="query" class="form-control" placeholder="What do you want to find?" value="{{ query|default:'' }}">
+        </div>
+        <input type="hidden" name="top_k" value="5">
+        <button type="submit" class="btn btn-primary btn-full">Search Memory</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Results + Docs -->
+  <div>
+    {% if rag_results %}
+    <div class="card">
+      <div class="card-title">Results for "{{ query }}"</div>
+      {% for r in rag_results %}
+      <div style="padding:0.6rem 0; border-bottom:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.2rem;">
+          <strong style="color:#fff; font-size:0.85rem">{{ r.title }}</strong>
+          <span class="badge badge-green">{{ r.score|floatformat:3 }}</span>
+        </div>
+        <p style="color:var(--muted); font-size:0.78rem; margin:0;">{{ r.snippet|truncatechars:120 }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-title">Indexed Documents</div>
+      {% if documents %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Title</th><th>Type</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for doc in documents %}
+            <tr>
+              <td style="color:#fff; font-size:0.82rem">{{ doc.title|truncatechars:30 }}</td>
+              <td><span class="badge badge-blue">{{ doc.doc_type }}</span></td>
+              <td><span class="badge badge-{{ doc.embedding_status }}">{{ doc.embedding_status }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty">No documents indexed yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

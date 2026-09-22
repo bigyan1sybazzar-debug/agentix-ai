@@ -1,0 +1,70 @@
+{% extends "learnami/base.html" %}
+
+{% block title %}Operational Runbooks | Learnami{% endblock %}
+
+{% block content %}
+<div class="header-banner">
+  <div>
+    <h2 style="margin:0; font-size:1.4rem;">🔧 Operational Runbooks & Self-Healing Playbooks</h2>
+    <p style="margin:0.25rem 0 0 0; font-size:0.85rem; opacity:0.85;">
+      Standardized self-healing playbooks for policy errors, moderation surges, queue backups, and system outage recovery.
+    </p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+  <h3 style="margin-top:0;">Available Runbook Catalog</h3>
+  <div class="grid grid-2">
+    {% for r in catalog %}
+    <div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:var(--bg-dark);">
+      <h4 style="margin:0 0 0.35rem 0; color:var(--primary);">{{ r.title }}</h4>
+      <p style="font-size:0.8rem; color:var(--muted); margin:0 0 0.75rem 0;">{{ r.description }}</p>
+      <ul style="font-size:0.75rem; padding-left:1.2rem; margin:0 0 1rem 0;">
+        {% for step in r.steps %}
+        <li>{{ step }}</li>
+        {% endfor %}
+      </ul>
+      <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="runbook_key" value="{{ r.key }}">
+        <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">Execute Runbook</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+  <h3 style="margin-top:0;">Runbook Execution Audit Trail</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Runbook Key</th>
+        <th>Triggered By</th>
+        <th>Status</th>
+        <th>Steps Completed</th>
+        <th>Started At</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ex in executions %}
+      <tr>
+        <td>#{{ ex.id }}</td>
+        <td><code>{{ ex.runbook_key }}</code></td>
+        <td>{{ ex.triggered_by }}</td>
+        <td>
+          <span class="badge badge-{% if ex.status == 'completed' %}approved{% else %}pending{% endif %}">
+            {{ ex.status|upper }}
+          </span>
+        </td>
+        <td style="font-size:0.75rem;">{{ ex.steps_completed|length }} steps</td>
+        <td>{{ ex.created_at|date:"Y-m-d H:i:s" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center;">No runbook executions recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

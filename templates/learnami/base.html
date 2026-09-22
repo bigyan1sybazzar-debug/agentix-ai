@@ -1,0 +1,107 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Learnami AutoEngine{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body>
+  <div class="app-layout">
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <h1>⚡ Learnami</h1>
+        <small>Automation Engine</small>
+      </div>
+
+      <span class="nav-section">Main</span>
+      <a href="{% url 'dashboard' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <span class="icon">◻</span> Dashboard
+      </a>
+      <a href="{% url 'db_settings' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'db_settings' %}active{% endif %}">
+        <span class="icon">⬡</span> Database Setup
+      </a>
+
+      <span class="nav-section">Agent Layers</span>
+      <a href="{% url 'onboarding' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'onboarding' %}active{% endif %}">
+        <span class="icon">→</span> Onboarding
+      </a>
+      <a href="{% url 'moderation' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'moderation' %}active{% endif %}">
+        <span class="icon">→</span> Moderation
+      </a>
+      <a href="{% url 'governance' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'governance' %}active{% endif %}">
+        <span class="icon">→</span> Governance
+      </a>
+      <a href="{% url 'policy_registry' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'policy_registry' %}active{% endif %}">
+        <span class="icon">→</span> Policy & SFPs
+      </a>
+      <a href="{% url 'identity_workbench' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'identity_workbench' %}active{% endif %}">
+        <span class="icon">→</span> Identity
+      </a>
+      <a href="{% url 'retrieval_workbench' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'retrieval_workbench' %}active{% endif %}">
+        <span class="icon">→</span> Memory / RAG
+      </a>
+      <a href="{% url 'privacy' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'privacy' %}active{% endif %}">
+        <span class="icon">→</span> Privacy & Consent
+      </a>
+      <a href="{% url 'runbooks' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'runbooks' %}active{% endif %}">
+        <span class="icon">→</span> Runbooks
+      </a>
+      <a href="{% url 'blueprint' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'blueprint' %}active{% endif %}">
+        <span class="icon">→</span> Blueprint
+      </a>
+      <a href="{% url 'media_assistant' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'media_assistant' %}active{% endif %}">
+        <span class="icon">→</span> Media Assistant
+      </a>
+      <a href="{% url 'analytics' %}"
+        class="nav-item {% if request.resolver_match.url_name == 'analytics' %}active{% endif %}">
+        <span class="icon">→</span> Analytics
+      </a>
+
+      <div class="sidebar-footer">
+        <a href="{% url 'db_settings' %}" class="db-badge">
+          <span class="dot {% if not db_status.is_mysql %}sqlite{% endif %}"></span>
+          {% if db_status.is_mysql %}MySQL: {{ db_status.db_name|truncatechars:14 }}{% else %}SQLite (local){% endif %}
+        </a>
+        <a href="{% url 'run_automation' %}" class="run-btn">⚡ Run All Automations</a>
+      </div>
+    </aside>
+
+    <!-- Page Content -->
+    <div class="main-content">
+
+      {% if messages %}
+      {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }}">
+        <span>{{ msg }}</span>
+        <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </div>
+
+  </div>
+</body>
+
+</html>

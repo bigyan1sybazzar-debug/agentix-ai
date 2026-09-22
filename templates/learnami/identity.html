@@ -1,0 +1,121 @@
+{% extends "learnami/base.html" %}
+{% block title %}Identity Resolution | Learnami{% endblock %}
+{% block content %}
+
+<h1 class="page-title">Identity Resolution</h1>
+<p class="page-sub">Cross-site user linking, duplicate detection, and trust scoring.</p>
+
+<div class="stats-row" style="grid-template-columns:repeat(4,1fr);">
+  <div class="stat-box">
+    <div class="stat-label">Total Links</div>
+    <div class="stat-value">{{ total_links }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Confirmed</div>
+    <div class="stat-value">{{ confirmed_count }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Candidates</div>
+    <div class="stat-value">{{ candidate_count }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Rejected</div>
+    <div class="stat-value">{{ rejected_count }}</div>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- Create Link Form -->
+  <div class="card">
+    <div class="card-row">
+      <div class="card-title" style="margin-bottom:0">Create Identity Link</div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="run_identity_batch">
+        <button type="submit" class="btn btn-secondary btn-sm">⚡ Run Batch</button>
+      </form>
+    </div>
+    <br>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create_link">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Primary WP ID</label>
+          <input type="number" name="primary_wp_user_id" class="form-control" value="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Linked WP ID</label>
+          <input type="number" name="linked_wp_user_id" class="form-control" value="200">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Primary Site</label>
+          <input type="text" name="primary_site" class="form-control" placeholder="site1.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Linked Site</label>
+          <input type="text" name="linked_site" class="form-control" placeholder="site2.com">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Shared Email</label>
+        <input type="email" name="shared_email" class="form-control" placeholder="common@email.com">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Primary Username</label>
+          <input type="text" name="primary_username" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Linked Username</label>
+          <input type="text" name="linked_username" class="form-control">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Link &amp; Score</button>
+    </form>
+  </div>
+
+  <!-- Links Table -->
+  <div class="card">
+    <div class="card-title">Identity Links</div>
+    {% if links %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Primary</th><th>Linked</th><th>Score</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          {% for link in links %}
+          <tr>
+            <td style="font-size:0.8rem">{{ link.primary_site }}<br><small>#{{ link.primary_wp_user_id }}</small></td>
+            <td style="font-size:0.8rem">{{ link.linked_site }}<br><small>#{{ link.linked_wp_user_id }}</small></td>
+            <td>
+              <span class="badge badge-{% if link.confidence_score > 0.7 %}green{% elif link.confidence_score > 0.4 %}amber{% else %}red{% endif %}">
+                {{ link.confidence_score|floatformat:2 }}
+              </span>
+            </td>
+            <td><span class="badge badge-{{ link.link_status }}">{{ link.link_status }}</span></td>
+            <td>
+              <form method="post" style="display:flex; gap:0.3rem;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="confirm_link">
+                <input type="hidden" name="link_id" value="{{ link.id }}">
+                <button name="decision" value="confirmed" class="btn btn-success btn-sm">✓</button>
+                <button name="decision" value="rejected" class="btn btn-danger btn-sm">✗</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">No identity links yet.</div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

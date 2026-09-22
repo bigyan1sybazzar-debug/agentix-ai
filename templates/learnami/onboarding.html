@@ -1,0 +1,104 @@
+{% extends "learnami/base.html" %}
+{% block title %}Onboarding | Learnami{% endblock %}
+{% block content %}
+
+<h1 class="page-title">Onboarding</h1>
+<p class="page-sub">Registration risk evaluation, email verification &amp; progressive role unlocking.</p>
+
+<!-- Stats -->
+<div class="stats-row" style="grid-template-columns:repeat(3,1fr);">
+  <div class="stat-box">
+    <div class="stat-label">Total Users</div>
+    <div class="stat-value">{{ total_users }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Trusted</div>
+    <div class="stat-value">{{ trusted_users }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Probationary</div>
+    <div class="stat-value">{{ probationary }}</div>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- Register Form -->
+  <div class="card">
+    <div class="card-row">
+      <div class="card-title" style="margin-bottom:0">Evaluate Registration</div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="run_onboarding_batch">
+        <button type="submit" class="btn btn-secondary btn-sm">⚡ Run Batch</button>
+      </form>
+    </div>
+    <br>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="register_user">
+      <div class="form-group">
+        <label class="form-label">WP User ID</label>
+        <input type="number" name="wp_user_id" class="form-control" value="105">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" name="username" class="form-control" placeholder="e.g. alex_reviewer" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-control" placeholder="user@gmail.com" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Evaluate &amp; Register</button>
+    </form>
+  </div>
+
+  <!-- Users Table -->
+  <div class="card">
+    <div class="card-title">Registered Users</div>
+    {% if users %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>User</th><th>Risk</th><th>Stage</th><th>Role</th><th>Post?</th><th>Update</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td><strong style="color:#fff">{{ u.username }}</strong><br><small>{{ u.email }}</small></td>
+            <td>
+              <span class="badge badge-{% if u.risk_score > 0.5 %}red{% elif u.risk_score > 0.2 %}amber{% else %}green{% endif %}">
+                {{ u.risk_score|floatformat:2 }}
+              </span>
+            </td>
+            <td><span class="badge badge-blue">{{ u.onboarding_stage }}</span></td>
+            <td style="font-size:0.78rem">{{ u.assigned_role }}</td>
+            <td>{% if u.can_post %}<span class="badge badge-green">Yes</span>{% else %}<span class="badge badge-red">No</span>{% endif %}</td>
+            <td>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_asks">
+                <input type="hidden" name="user_id" value="{{ u.id }}">
+                <label style="font-size:0.7rem"><input type="checkbox" name="email_verified" {% if u.email_verified %}checked{% endif %}> Email verified</label><br>
+                <input type="number" name="age" value="{{ u.age|default:'' }}" placeholder="Age" style="width:55px;background:var(--bg-input);border:1px solid var(--border);color:#fff;border-radius:4px;padding:2px 6px;font-size:0.75rem;margin-top:3px">
+                <input type="text" name="location" value="{{ u.location|default:'' }}" placeholder="CC" style="width:38px;background:var(--bg-input);border:1px solid var(--border);color:#fff;border-radius:4px;padding:2px 6px;font-size:0.75rem;">
+                <br>
+                <input type="text" name="bio" value="{{ u.bio|default:'' }}" placeholder="Bio..." style="width:110px;background:var(--bg-input);border:1px solid var(--border);color:#fff;border-radius:4px;padding:2px 6px;font-size:0.75rem;margin-top:3px">
+                <br>
+                <button type="submit" class="btn btn-secondary btn-sm" style="margin-top:4px">Save</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">No users yet. Evaluate a registration above.</div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

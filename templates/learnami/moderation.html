@@ -1,0 +1,157 @@
+{% extends "learnami/base.html" %}
+{% block title %}Moderation | Learnami{% endblock %}
+{% block content %}
+
+<h1 class="page-title">Content Moderation</h1>
+<p class="page-sub">Submit content for automated scoring, flag, or escalate to human review.</p>
+
+<!-- Stat Cards with Clickable Filter Links -->
+<div class="stats-row" style="grid-template-columns:repeat(5,1fr);">
+  <a href="?status=all" class="stat-box" style="text-decoration:none; cursor:pointer; {% if active_filter == 'all' %}border:2px solid var(--primary); background:rgba(99,102,241,0.15);{% endif %}">
+    <div class="stat-label">All Submissions</div>
+    <div class="stat-value">{{ all_submissions_count }}</div>
+  </a>
+  <a href="?status=pending" class="stat-box" style="text-decoration:none; cursor:pointer; {% if active_filter == 'pending' or active_filter == 'submitted' %}border:2px solid var(--warning); background:rgba(245,158,11,0.15);{% endif %}">
+    <div class="stat-label">Pending / Submitted</div>
+    <div class="stat-value">{{ submitted_count }}</div>
+  </a>
+  <a href="?status=approved" class="stat-box" style="text-decoration:none; cursor:pointer; {% if active_filter == 'approved' %}border:2px solid var(--success); background:rgba(16,185,129,0.2);{% endif %}">
+    <div class="stat-label">✓ Approved</div>
+    <div class="stat-value" style="color:#10b981;">{{ approved_count }}</div>
+  </a>
+  <a href="?status=flagged" class="stat-box" style="text-decoration:none; cursor:pointer; {% if active_filter == 'flagged' %}border:2px solid var(--danger); background:rgba(239,68,68,0.15);{% endif %}">
+    <div class="stat-label">🚩 Flagged</div>
+    <div class="stat-value" style="color:#ef4444;">{{ flagged_count }}</div>
+  </a>
+  <a href="?status=rejected" class="stat-box" style="text-decoration:none; cursor:pointer; {% if active_filter == 'rejected' %}border:2px solid #8b5cf6; background:rgba(139,92,246,0.15);{% endif %}">
+    <div class="stat-label">Rejected</div>
+    <div class="stat-value">{{ rejected_count }}</div>
+  </a>
+</div>
+
+<div class="two-col">
+
+  <!-- Submit Form -->
+  <div class="card">
+    <div class="card-row">
+      <div class="card-title" style="margin-bottom:0">Submit Content</div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="run_moderation_batch">
+        <button class="btn btn-secondary btn-sm" type="submit">⚡ Run Batch Moderation</button>
+      </form>
+    </div>
+    <br>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="submit_content">
+      <div class="form-group">
+        <label class="form-label">WP User ID</label>
+        <input type="number" name="wp_user_id" class="form-control" value="101" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Type</label>
+          <select name="content_type" class="form-control">
+            <option value="review">Review Post</option>
+            <option value="comment">Comment</option>
+            <option value="forum_topic">Forum Topic</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Language</label>
+          <input type="text" name="language" class="form-control" value="en">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input type="text" name="title" class="form-control" placeholder="Content title..." required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Body</label>
+        <textarea name="body" class="form-control" placeholder="Paste or type content here..." required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Submit for Moderation</button>
+    </form>
+  </div>
+
+  <!-- Queue / Filtered Submissions Table -->
+  <div class="card">
+    <div class="card-row" style="align-items:center; margin-bottom:1rem;">
+      <div class="card-title" style="margin-bottom:0;">
+        {% if active_filter == 'approved' %}
+          <span style="color:#10b981;">✓ Approved Submissions</span>
+        {% elif active_filter == 'pending' or active_filter == 'submitted' %}
+          <span style="color:#f59e0b;">⏳ Pending Submissions</span>
+        {% elif active_filter == 'flagged' %}
+          <span style="color:#ef4444;">🚩 Flagged Submissions</span>
+        {% elif active_filter == 'rejected' %}
+          <span style="color:#8b5cf6;">Rejected Submissions</span>
+        {% else %}
+          Submissions Queue (All)
+        {% endif %}
+      </div>
+      <div style="display:flex; gap:0.3rem;">
+        <a href="?status=all" class="btn btn-sm {% if active_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}">All</a>
+        <a href="?status=approved" class="btn btn-sm {% if active_filter == 'approved' %}btn-primary{% else %}btn-secondary{% endif %}">Approved ({{ approved_count }})</a>
+        <a href="?status=pending" class="btn btn-sm {% if active_filter == 'pending' %}btn-primary{% else %}btn-secondary{% endif %}">Pending</a>
+        <a href="?status=flagged" class="btn btn-sm {% if active_filter == 'flagged' %}btn-primary{% else %}btn-secondary{% endif %}">Flagged</a>
+      </div>
+    </div>
+
+    {% if submissions %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Author</th>
+            <th>Title &amp; Excerpt</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in submissions %}
+          <tr>
+            <td>
+              <strong style="color:#fff; font-size:0.82rem;">{{ s.author_username }}</strong>
+              <div style="font-size:0.7rem; color:var(--muted);">ID #{{ s.wp_user_id }}</div>
+            </td>
+            <td>
+              <strong style="color:#fff; font-size:0.82rem;">{{ s.title }}</strong>
+              <div style="font-size:0.75rem; color:var(--muted); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                {{ s.body }}
+              </div>
+            </td>
+            <td><span class="badge badge-blue">{{ s.content_type }}</span></td>
+            <td>
+              <span class="badge badge-{% if s.status == 'approved' %}approved{% elif s.status == 'flagged' %}rejected{% elif s.status == 'submitted' %}pending{% else %}secondary{% endif %}">
+                {{ s.status|upper }}
+              </span>
+            </td>
+            <td>
+              {% if s.status == 'submitted' or s.status == 'flagged' %}
+              <form method="post" style="display:flex; gap:0.3rem;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="resolve_case">
+                <input type="hidden" name="submission_id" value="{{ s.id }}">
+                <button name="decision" value="approved" class="btn btn-success btn-sm" title="Approve Submission">✓ Approve</button>
+                <button name="decision" value="rejected" class="btn btn-danger btn-sm" title="Reject Submission">✗ Reject</button>
+              </form>
+              {% else %}
+              <span style="font-size:0.75rem; color:var(--muted);">Completed</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">No submissions found matching filter '{{ active_filter|upper }}'.</div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

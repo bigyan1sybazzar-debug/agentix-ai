@@ -1,0 +1,91 @@
+{% extends "learnami/base.html" %}
+{% block title %}Analytics | Learnami{% endblock %}
+{% block content %}
+
+<h1 class="page-title">Analytics</h1>
+<p class="page-sub">Module performance snapshots across all automation layers.</p>
+
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="stat-label">Total Runs</div>
+    <div class="stat-value">{{ total_runs }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Successful</div>
+    <div class="stat-value">{{ successful_runs }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Failed</div>
+    <div class="stat-value">{{ failed_runs }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Items Processed</div>
+    <div class="stat-value">{{ total_items }}</div>
+  </div>
+</div>
+
+<!-- Automation Task Log -->
+<div class="card">
+  <div class="card-row">
+    <div class="card-title" style="margin-bottom:0">Task Log</div>
+    <a href="{% url 'run_automation' %}" class="btn btn-primary btn-sm">⚡ Run Now</a>
+  </div>
+  <br>
+  {% if logs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Pipeline</th><th>Status</th><th>Items</th><th>Duration</th><th>Summary</th></tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td style="font-family:monospace; font-size:0.72rem; white-space:nowrap">{{ log.created_at|date:"m/d H:i" }}</td>
+          <td style="font-size:0.8rem; color:#fff">{{ log.pipeline_name }}</td>
+          <td>
+            <span class="badge badge-{% if log.status == 'completed' %}green{% elif log.status == 'failed' %}red{% else %}amber{% endif %}">
+              {{ log.status }}
+            </span>
+          </td>
+          <td><span class="badge badge-blue">{{ log.items_processed }}</span></td>
+          <td style="color:var(--muted); font-size:0.75rem">
+            {% if log.duration_seconds %}{{ log.duration_seconds|floatformat:1 }}s{% else %}—{% endif %}
+          </td>
+          <td style="color:var(--muted); font-size:0.78rem">{{ log.summary|truncatechars:60 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No task logs yet.</div>
+  {% endif %}
+</div>
+
+<!-- Module Snapshots -->
+{% if snapshots %}
+<div class="card">
+  <div class="card-title">Module Snapshots</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Module</th><th>Date</th><th>Active Users</th><th>New Content</th><th>Flagged</th><th>Avg Score</th></tr>
+      </thead>
+      <tbody>
+        {% for snap in snapshots %}
+        <tr>
+          <td style="color:#fff; font-size:0.82rem">{{ snap.module_name }}</td>
+          <td style="font-size:0.78rem; color:var(--muted)">{{ snap.snapshot_date }}</td>
+          <td>{{ snap.active_users }}</td>
+          <td>{{ snap.new_content_count }}</td>
+          <td><span class="badge badge-{% if snap.flagged_count > 5 %}red{% elif snap.flagged_count > 1 %}amber{% else %}green{% endif %}">{{ snap.flagged_count }}</span></td>
+          <td>{{ snap.avg_quality_score|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "learnami/base.html" %}
+
+{% block title %}Production Blueprint | Learnami{% endblock %}
+
+{% block content %}
+<div class="header-banner">
+  <div>
+    <h2 style="margin:0; font-size:1.4rem;">🏛️ System Production Blueprint</h2>
+    <p style="margin:0.25rem 0 0 0; font-size:0.85rem; opacity:0.85;">
+      Consolidated architecture definition, deployment zones, governance core, operational core, and snapshot management.
+    </p>
+  </div>
+  <form method="POST" style="margin-left:auto;">
+    {% csrf_token %}
+    <input type="hidden" name="snapshot_name" value="blueprint_snapshot_{{ snapshots|length|add:1 }}">
+    <button type="submit" class="btn btn-secondary btn-sm">📷 Take Blueprint Snapshot</button>
+  </form>
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+  <h3 style="margin-top:0;">5 Consolidated Architectural Blocks</h3>
+  <div class="grid grid-2">
+    {% for block in blueprint.consolidated_blocks %}
+    <div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:var(--bg-dark);">
+      <h4 style="margin:0 0 0.5rem 0; color:var(--primary);">{{ block.name }}</h4>
+      <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+        {% for comp in block.components %}
+        <span class="badge badge-approved" style="font-size:0.75rem;">{{ comp }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:1.5rem;">
+  <div class="card">
+    <h3 style="margin-top:0;">Deployment & Security Zones</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Zone</th>
+          <th>Implementation Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for zone_name, zone_val in blueprint.deployment_zones.items %}
+        <tr>
+          <td><code>{{ zone_name }}</code></td>
+          <td>{{ zone_val }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Blueprint Snapshots Audit Log</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Snapshot Name</th>
+          <th>Created At</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in snapshots %}
+        <tr>
+          <td>#{{ s.id }}</td>
+          <td><code>{{ s.snapshot_name }}</code></td>
+          <td>{{ s.created_at|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" style="text-align:center;">No snapshots saved.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
