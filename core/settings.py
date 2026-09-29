@@ -29,6 +29,21 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 # Allow Railway-injected domain + localhost
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
+# Trusted origins for CSRF origin checking (required when site runs behind HTTPS, e.g. Railway)
+CSRF_TRUSTED_ORIGINS = [
+    "https://agentix-ai-production.up.railway.app",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+# Add any extra origins via env var, comma-separated, e.g. "https://foo.com,https://bar.com"
+_extra_origins = os.environ.get("CSRF_TRUSTED_ORIGINS", "")
+if _extra_origins:
+    CSRF_TRUSTED_ORIGINS.extend(o.strip() for o in _extra_origins.split(",") if o.strip())
+
+# Respect the X-Forwarded-Proto header from Railway's proxy so HTTPS is detected correctly
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # Application definition
 
 INSTALLED_APPS = [
