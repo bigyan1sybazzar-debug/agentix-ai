@@ -19,46 +19,17 @@
       </div>
 
       <span class="nav-section">Main</span>
+      <a href="/onboarding/" class="nav-item <%= activeNav === 'onboarding' ? 'active' : '' %>">
+        <span class="icon">👥</span> Onboarding &amp; Users
+      </a>
       <a href="/" class="nav-item <%= activeNav === 'dashboard' ? 'active' : '' %>">
         <span class="icon">◻</span> Dashboard
       </a>
       <a href="/db-settings/" class="nav-item <%= activeNav === 'db_settings' ? 'active' : '' %>">
         <span class="icon">⬡</span> Database Setup
       </a>
-
-      <span class="nav-section">Agent Layers</span>
-      <a href="/onboarding/" class="nav-item <%= activeNav === 'onboarding' ? 'active' : '' %>">
-        <span class="icon">→</span> Onboarding
-      </a>
-      <a href="/moderation/" class="nav-item <%= activeNav === 'moderation' ? 'active' : '' %>">
-        <span class="icon">→</span> Moderation
-      </a>
-      <a href="/governance/" class="nav-item <%= activeNav === 'governance' ? 'active' : '' %>">
-        <span class="icon">→</span> Governance
-      </a>
-      <a href="/policies/" class="nav-item <%= activeNav === 'policy_registry' ? 'active' : '' %>">
-        <span class="icon">→</span> Policy &amp; SFPs
-      </a>
-      <a href="/identity/" class="nav-item <%= activeNav === 'identity' ? 'active' : '' %>">
-        <span class="icon">→</span> Identity
-      </a>
-      <a href="/retrieval/" class="nav-item <%= activeNav === 'retrieval' ? 'active' : '' %>">
-        <span class="icon">→</span> Memory / RAG
-      </a>
-      <a href="/privacy/" class="nav-item <%= activeNav === 'privacy' ? 'active' : '' %>">
-        <span class="icon">→</span> Privacy &amp; Consent
-      </a>
-      <a href="/runbooks/" class="nav-item <%= activeNav === 'runbooks' ? 'active' : '' %>">
-        <span class="icon">→</span> Runbooks
-      </a>
-      <a href="/blueprint/" class="nav-item <%= activeNav === 'blueprint' ? 'active' : '' %>">
-        <span class="icon">→</span> Blueprint
-      </a>
-      <a href="/media/" class="nav-item <%= activeNav === 'media' ? 'active' : '' %>">
-        <span class="icon">→</span> Media Assistant
-      </a>
-      <a href="/analytics/" class="nav-item <%= activeNav === 'analytics' ? 'active' : '' %>">
-        <span class="icon">→</span> Analytics
+      <a href="/smtp-settings/" class="nav-item <%= activeNav === 'smtp_settings' ? 'active' : '' %>">
+        <span class="icon">✉</span> SMTP &amp; Email
       </a>
 
       <div class="sidebar-footer">
@@ -70,7 +41,10 @@
             SQLite / In-Memory (Active)
           <% } %>
         </a>
-        <a href="/run-automation/" class="run-btn">⚡ Run All Automations</a>
+        <form method="post" action="/onboarding/" style="margin:0;">
+          <input type="hidden" name="action" value="run_onboarding_batch">
+          <button type="submit" class="run-btn" style="width:100%; border:none; cursor:pointer;">⚡ Run Onboarding Batch</button>
+        </form>
       </div>
     </aside>
 

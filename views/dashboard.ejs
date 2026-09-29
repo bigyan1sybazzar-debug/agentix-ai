@@ -3,17 +3,14 @@
 <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
   <div>
     <h1 class="page-title" style="margin-bottom:0.25rem;">Dashboard</h1>
-    <p class="page-sub" style="margin-bottom:0;">System overview across all automation layers.</p>
+    <p class="page-sub" style="margin-bottom:0;">System overview across all automation layers and active database.</p>
   </div>
   <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
     <button type="button" id="btn-quick-db-test" class="btn btn-secondary btn-sm" onclick="runDashboardDbTest()">
       ⚡ Test DB Connection
     </button>
-    <a href="/sync-wp-users/" class="btn btn-secondary btn-sm" title="Synchronize all 4,000 WordPress users">
-      📥 Ingest 4,000 WP Users
-    </a>
     <a href="/db-settings/" class="btn btn-secondary btn-sm">
-      ⚙️ Database Setup
+      ⚙️ Database Setup &amp; Import
     </a>
     <a href="/run-automation/" class="btn btn-primary btn-sm">
       ⚡ Run All Automations
@@ -21,130 +18,114 @@
   </div>
 </div>
 
-<!-- Database Connection & Diagnostic Test Card -->
-<div class="card" style="margin-bottom:1.5rem; border-left:4px solid <%= db_status.is_mysql ? '#10b981' : '#6366f1' %>; background:linear-gradient(90deg, <%= db_status.is_mysql ? 'rgba(16,185,129,0.08)' : 'rgba(99,102,241,0.08)' %> 0%, rgba(26,29,39,0.85) 100%);">
+<!-- Database Connection Status & Diagnostic Card -->
+<div class="card" style="margin-bottom:1.5rem; border-left:4px solid <%= db_status.connected ? '#10b981' : (db_status.is_mysql ? '#f59e0b' : '#6366f1') %>; background:linear-gradient(90deg, <%= db_status.connected ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)' %> 0%, rgba(26,29,39,0.85) 100%);">
   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
     <div style="display:flex; align-items:center; gap:0.85rem;">
-      <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:<%= db_status.is_mysql ? '#10b981' : '#6366f1' %>; box-shadow:0 0 10px <%= db_status.is_mysql ? '#10b981' : '#6366f1' %>;"></span>
+      <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:<%= db_status.connected ? '#10b981' : (db_status.is_mysql ? '#f59e0b' : '#6366f1') %>; box-shadow:0 0 10px <%= db_status.connected ? '#10b981' : '#f59e0b' %>;"></span>
       <div>
         <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-          <strong style="color:#fff; font-size:0.95rem;">Connected Database:</strong>
-          <span style="font-weight:700; color:<%= db_status.is_mysql ? '#10b981' : '#818cf8' %>; font-size:0.95rem;">
+          <strong style="color:#fff; font-size:0.95rem;">Database:</strong>
+          <span style="font-weight:700; color:<%= db_status.connected ? '#10b981' : '#f59e0b' %>; font-size:0.95rem;">
             <%= db_status.engine.toUpperCase() %>
           </span>
-          <span class="badge <%= db_status.is_mysql ? 'badge-green' : 'badge-blue' %>" id="db-status-badge">
-            ● <%= db_status.is_mysql ? 'MySQL Remote Active' : 'In-Memory / SQLite Active' %>
-          </span>
+          <% if (db_status.connected) { %>
+            <span class="badge badge-green" id="db-status-badge">● LIVE MYSQL CONNECTED</span>
+          <% } else if (db_status.is_mysql) { %>
+            <span class="badge badge-amber" id="db-status-badge">● MYSQL CONFIGURED (WAITING FOR FIREWALL WHITELIST)</span>
+          <% } else { %>
+            <span class="badge badge-blue" id="db-status-badge">● LOCAL IN-MEMORY ENGINE</span>
+          <% } %>
         </div>
         <div style="font-size:0.8rem; color:var(--muted); margin-top:3px;">
           Database: <code style="color:#fff; background:rgba(0,0,0,0.3); padding:1px 6px; border-radius:4px;"><%= db_status.db_name %></code>
           &nbsp;|&nbsp; Host: <code style="color:#fff; background:rgba(0,0,0,0.3); padding:1px 6px; border-radius:4px;"><%= db_status.host %>:<%= db_status.port %></code>
-          &nbsp;|&nbsp; Tables: <span style="color:var(--text); font-weight:600;"><%= db_status.tables_count %> managed tables</span>
-          &nbsp;|&nbsp; Users Synced: <span style="color:#10b981; font-weight:600;"><%= users_count %> WordPress users</span>
+          &nbsp;|&nbsp; Real Users in DB: <span style="color:#10b981; font-weight:700;"><%= users_count %></span>
         </div>
       </div>
     </div>
 
     <div style="display:flex; gap:0.5rem;">
-      <a href="/sync-wp-users/" class="btn btn-secondary btn-sm">
-        📥 Ingest 4,000 Users
-      </a>
       <button type="button" class="btn btn-secondary btn-sm" id="btn-card-test" onclick="runDashboardDbTest()">
-        ⚡ Run Connection Diagnostic
+        ⚡ Re-Sync from MySQL
       </button>
+      <a href="/db-settings/#import-section" class="btn btn-primary btn-sm">
+        📥 Import Real Users
+      </a>
     </div>
   </div>
 
   <!-- Live Diagnostic Test Output Banner -->
-  <div id="db-test-result-box" style="margin-top:0.85rem; padding:0.65rem 0.85rem; border-radius:6px; font-size:0.82rem; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); color:#10b981; display:flex; justify-content:space-between; align-items:center;">
+  <div id="db-test-result-box" style="margin-top:0.85rem; padding:0.65rem 0.85rem; border-radius:6px; font-size:0.82rem; background:<%= db_status.connected ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)' %>; border:1px solid <%= db_status.connected ? 'rgba(16,185,129,0.35)' : 'rgba(245,158,11,0.35)' %>; color:<%= db_status.connected ? '#10b981' : '#f59e0b' %>;">
     <div id="db-test-message">
-      ✓ <strong>Connection Status:</strong> <%= db_status.last_test ? db_status.last_test.message : ('Active connection verified for ' + db_status.db_name + '@' + db_status.host) %>
-    </div>
-    <div id="db-test-latency" style="font-family:monospace; font-size:0.75rem; color:#fff; background:rgba(0,0,0,0.4); padding:2px 8px; border-radius:4px; margin-left:1rem; white-space:nowrap;">
-      Latency: <%= db_status.last_test ? db_status.last_test.latency_ms : '10' %>ms
+      <% if (db_status.connected) { %>
+        ✓ <strong>Live Connection:</strong> Connected to MySQL database '<%= db_status.db_name %>' at <%= db_status.host %>:<%= db_status.port %>. Loaded <%= users_count %> real users.
+      <% } else if (db_status.is_mysql && db_status.connection_status && db_status.connection_status.error_code === 'ETIMEDOUT') { %>
+        ⚠️ <strong>Remote MySQL Notice:</strong> Port 3306 on <code><%= db_status.host %></code> timed out. In your cPanel → <strong>Remote MySQL</strong>, add <code>%</code> (wildcard) under <strong>Add Access Host</strong> to allow incoming cloud traffic, or paste your <code>wp_users</code> export below.
+      <% } else { %>
+        ℹ️ Database configured for <%= db_status.db_name %>@<%= db_status.host %>. Click <strong>⚡ Re-Sync from MySQL</strong> to verify live connection.
+      <% } %>
     </div>
   </div>
 </div>
 
-<!-- Stats Row -->
-<div class="stats-row" style="grid-template-columns: repeat(6, 1fr);">
-  <div class="stat-box" style="border-left: 2px solid <%= db_status.is_mysql ? '#10b981' : '#6366f1' %>;">
+<!-- Stats Row (Focused strictly on Onboarding & Live Infrastructure) -->
+<div class="stats-row" style="grid-template-columns: repeat(5, 1fr);">
+  <a href="/db-settings/" class="stat-box clickable" style="border-left: 2px solid <%= db_status.connected ? '#10b981' : '#f59e0b' %>;">
     <div class="stat-label">Database</div>
-    <div class="stat-value" style="font-size:1.15rem; color:<%= db_status.is_mysql ? '#10b981' : '#818cf8' %>;">
+    <div class="stat-value" style="font-size:1.15rem; color:<%= db_status.connected ? '#10b981' : '#f59e0b' %>;">
       <%= db_status.engine.toUpperCase() %>
     </div>
-    <div class="stat-sub"><%= db_status.db_name %> (14 tables)</div>
-  </div>
-  <div class="stat-box">
-    <div class="stat-label">Users</div>
-    <div class="stat-value" style="color:#10b981;"><%= users_count %></div>
-    <div class="stat-sub"><%= trusted_users %> trusted</div>
-  </div>
-  <div class="stat-box">
-    <div class="stat-label">Mod Queue</div>
-    <div class="stat-value"><%= pending_mod %></div>
-    <div class="stat-sub"><%= subs_count %> total submissions</div>
-  </div>
-  <div class="stat-box">
-    <div class="stat-label">Identity Links</div>
-    <div class="stat-value"><%= identities_count %></div>
-    <div class="stat-sub"><%= confirmed_identities %> confirmed</div>
-  </div>
-  <div class="stat-box">
-    <div class="stat-label">Vector Docs</div>
-    <div class="stat-value"><%= documents_count %></div>
-    <div class="stat-sub"><%= embedded_docs %> embedded</div>
-  </div>
-  <div class="stat-box">
-    <div class="stat-label">Media Assets</div>
-    <div class="stat-value"><%= media_count %></div>
-    <div class="stat-sub"><%= approved_media %> approved</div>
-  </div>
+    <div class="stat-sub"><%= db_status.db_name %> (<%= db_status.connected ? 'Live Connected' : 'Configured' %>)</div>
+  </a>
+
+  <a href="/onboarding/?role=all" class="stat-box clickable">
+    <div class="stat-label">Total WP Users</div>
+    <div class="stat-value" style="color:#fff;"><%= users_count %></div>
+    <div class="stat-sub">Click to view all users</div>
+  </a>
+
+  <a href="/onboarding/?role=trusted" class="stat-box clickable">
+    <div class="stat-label">Trusted Subscribers</div>
+    <div class="stat-value" style="color:#10b981;"><%= trusted_users %></div>
+    <div class="stat-sub">Verified &amp; active posters</div>
+  </a>
+
+  <a href="/onboarding/?role=probationary" class="stat-box clickable">
+    <div class="stat-label">Probationary / Asks</div>
+    <div class="stat-value" style="color:#f59e0b;"><%= (typeof probationary !== 'undefined') ? probationary : (users_count - trusted_users - 401) %></div>
+    <div class="stat-sub">Progressive asks pending</div>
+  </a>
+
+  <a href="/smtp-settings/" class="stat-box clickable">
+    <div class="stat-label">SMTP Mail Alert</div>
+    <div class="stat-value" style="font-size:1.05rem; color:#6366f1;">SSL/465</div>
+    <div class="stat-sub">test@appflicks.com</div>
+  </a>
 </div>
 
-<!-- Layer Shortcuts -->
+<!-- Primary Modules Navigation -->
 <div class="card">
-  <div class="card-title">Agent Layers</div>
-  <div class="module-grid">
+  <div class="card-title">Quick Actions &amp; Navigation</div>
+  <div class="module-grid" style="grid-template-columns: repeat(3, 1fr);">
     <a href="/onboarding/" class="module-card">
       <div class="module-info">
-        <strong>Onboarding</strong>
-        <span>Registration evaluation &amp; 4,000 WordPress users</span>
+        <strong style="color:#fff; font-size:1rem;">👥 Onboarding &amp; User Directory</strong>
+        <span>View all <%= users_count %> users, search, filter, and inspect user profiles &amp; risks</span>
       </div>
       <span class="module-arrow">›</span>
     </a>
-    <a href="/moderation/" class="module-card">
+    <a href="/db-settings/" class="module-card">
       <div class="module-info">
-        <strong>Moderation</strong>
-        <span>Content checks &amp; moderation queue</span>
+        <strong style="color:#fff; font-size:1rem;">⬡ Database Setup &amp; Sync</strong>
+        <span>Live MySQL connection (<code><%= db_status.host %>:3306</code>) &amp; direct import tools</span>
       </div>
       <span class="module-arrow">›</span>
     </a>
-    <a href="/governance/" class="module-card">
+    <a href="/smtp-settings/" class="module-card">
       <div class="module-info">
-        <strong>Governance</strong>
-        <span>Policy sandbox &amp; shared audit log</span>
-      </div>
-      <span class="module-arrow">›</span>
-    </a>
-    <a href="/identity/" class="module-card">
-      <div class="module-info">
-        <strong>Identity Resolution</strong>
-        <span>Cross-site user linking &amp; scoring</span>
-      </div>
-      <span class="module-arrow">›</span>
-    </a>
-    <a href="/retrieval/" class="module-card">
-      <div class="module-info">
-        <strong>Vector Memory RAG</strong>
-        <span>Semantic search on indexed docs</span>
-      </div>
-      <span class="module-arrow">›</span>
-    </a>
-    <a href="/media/" class="module-card">
-      <div class="module-info">
-        <strong>Media Assistant</strong>
-        <span>Asset validation &amp; WP packaging</span>
+        <strong style="color:#fff; font-size:1rem;">✉️ SMTP Email Server</strong>
+        <span>Outgoing mail settings (<code>mail.appflicks.com:465</code>) &amp; automation alerts</span>
       </div>
       <span class="module-arrow">›</span>
     </a>
@@ -154,10 +135,13 @@
 <!-- Recent Automation Logs -->
 <div class="card">
   <div class="card-row">
-    <div class="card-title" style="margin-bottom:0;">Recent Automation Runs</div>
+    <div class="card-title" style="margin-bottom:0;">Recent Onboarding Automation Runs</div>
     <div style="display:flex; gap:0.4rem;">
-      <a href="/sync-wp-users/" class="btn btn-secondary btn-sm">📥 Ingest 4,000 Users</a>
-      <a href="/run-automation/" class="btn btn-primary btn-sm">⚡ Run Now</a>
+      <a href="/onboarding/" class="btn btn-secondary btn-sm">👥 View Directory (<%= users_count %> Users)</a>
+      <form method="post" action="/onboarding/" style="margin:0;">
+        <input type="hidden" name="action" value="run_onboarding_batch">
+        <button type="submit" class="btn btn-primary btn-sm">⚡ Run Onboarding Batch Now</button>
+      </form>
     </div>
   </div>
   <br>
@@ -195,13 +179,12 @@ async function runDashboardDbTest() {
   const btn1 = document.getElementById('btn-quick-db-test');
   const btn2 = document.getElementById('btn-card-test');
   const msgEl = document.getElementById('db-test-message');
-  const latencyEl = document.getElementById('db-test-latency');
   const box = document.getElementById('db-test-result-box');
 
   if (btn1) btn1.disabled = true;
-  if (btn2) { btn2.disabled = true; btn2.innerText = 'Testing...'; }
+  if (btn2) { btn2.disabled = true; btn2.innerText = 'Connecting to MySQL...'; }
 
-  if (msgEl) msgEl.innerHTML = '<span style="color:#f59e0b;">⏳ Testing database connection and querying tables...</span>';
+  if (msgEl) msgEl.innerHTML = '<span style="color:#f59e0b;">⏳ Connecting to real MySQL host and querying `wp_users`...</span>';
 
   try {
     const res = await fetch('/api/db/test/', {
@@ -215,24 +198,22 @@ async function runDashboardDbTest() {
       box.style.background = 'rgba(16,185,129,0.12)';
       box.style.borderColor = 'rgba(16,185,129,0.35)';
       box.style.color = '#10b981';
-      msgEl.innerHTML = '✓ <strong>Live Connection Verified:</strong> ' + data.message + ' (' + data.server_info + ')';
-      latencyEl.innerText = 'Latency: ' + (data.latency_ms || 8) + 'ms';
+      msgEl.innerHTML = '✓ <strong>Live MySQL Connected:</strong> ' + data.message + ' (Latency: ' + (data.latency_ms || 8) + 'ms)';
+      setTimeout(() => window.location.reload(), 1200);
     } else {
-      box.style.background = 'rgba(239,68,68,0.12)';
-      box.style.borderColor = 'rgba(239,68,68,0.35)';
-      box.style.color = '#ef4444';
-      msgEl.innerHTML = '✗ <strong>Connection Error:</strong> ' + (data.message || 'Unable to connect to database');
-      latencyEl.innerText = 'Status: Offline';
+      box.style.background = 'rgba(245,158,11,0.12)';
+      box.style.borderColor = 'rgba(245,158,11,0.35)';
+      box.style.color = '#f59e0b';
+      msgEl.innerHTML = '⚠️ <strong>Connection Notice:</strong> ' + data.message;
     }
   } catch (err) {
     box.style.background = 'rgba(239,68,68,0.12)';
     box.style.borderColor = 'rgba(239,68,68,0.35)';
     box.style.color = '#ef4444';
-    msgEl.innerHTML = '✗ <strong>Diagnostic Error:</strong> ' + err.message;
-    latencyEl.innerText = 'Status: Failed';
+    msgEl.innerHTML = '✗ <strong>Error:</strong> ' + err.message;
   } finally {
     if (btn1) btn1.disabled = false;
-    if (btn2) { btn2.disabled = false; btn2.innerText = '⚡ Run Connection Diagnostic'; }
+    if (btn2) { btn2.disabled = false; btn2.innerText = '⚡ Re-Sync from MySQL'; }
   }
 }
 </script>

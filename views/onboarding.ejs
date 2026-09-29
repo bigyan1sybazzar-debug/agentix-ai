@@ -5,104 +5,145 @@
     <h1 class="page-title" style="margin-bottom:0.25rem;">Onboarding &amp; User Directory</h1>
     <p class="page-sub" style="margin-bottom:0;">Registration risk evaluation, email verification, progressive profiling &amp; WordPress 4,000 users sync.</p>
   </div>
-  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+    <a href="/smtp-settings/" class="btn btn-secondary btn-sm" style="display:inline-flex; align-items:center; gap:0.35rem;">
+      ✉️ <span>SMTP: <strong style="color:#10b981;">test@appflicks.com:465</strong></span>
+    </a>
     <form method="post" style="margin:0;">
       <input type="hidden" name="action" value="sync_wp_users">
       <button type="submit" class="btn btn-secondary btn-sm">📥 Sync 4,000 WP Users</button>
     </form>
     <form method="post" style="margin:0;">
       <input type="hidden" name="action" value="run_onboarding_batch">
-      <button type="submit" class="btn btn-primary btn-sm">⚡ Run Onboarding Batch</button>
+      <button type="submit" class="btn btn-primary btn-sm" style="background:#6366f1;">
+        ⚡ Run Onboarding Batch (Sync MySQL &amp; Email)
+      </button>
     </form>
   </div>
 </div>
 
-<!-- Stats -->
+<!-- Interactive Clickable Stat Boxes (Click to View / Filter) -->
 <div class="stats-row" style="grid-template-columns:repeat(4,1fr); margin-bottom:1.5rem;">
-  <div class="stat-box">
+  <a href="/onboarding/?role=all&limit=<%= typeof pageSize !== 'undefined' ? pageSize : 50 %>" class="stat-box clickable <%= (typeof roleFilter === 'undefined' || roleFilter === 'all') ? 'active-filter' : '' %>" title="Click to view all users">
+    <span class="click-indicator">Click to View All ›</span>
     <div class="stat-label">Total WordPress Users</div>
     <div class="stat-value"><%= total_users %></div>
     <div class="stat-sub"><%= total_users >= 4000 ? '4,000 cohort synchronized' : 'Starter demo set' %></div>
-  </div>
-  <div class="stat-box">
+  </a>
+
+  <a href="/onboarding/?role=trusted&limit=<%= typeof pageSize !== 'undefined' ? pageSize : 50 %>" class="stat-box clickable <%= (typeof roleFilter !== 'undefined' && roleFilter === 'trusted') ? 'active-filter' : '' %>" title="Click to filter trusted subscribers">
+    <span class="click-indicator">Filter ›</span>
     <div class="stat-label">Trusted Subscribers</div>
     <div class="stat-value" style="color:#10b981;"><%= trusted_users %></div>
     <div class="stat-sub">Verified &amp; active posters</div>
-  </div>
-  <div class="stat-box">
+  </a>
+
+  <a href="/onboarding/?role=probationary&limit=<%= typeof pageSize !== 'undefined' ? pageSize : 50 %>" class="stat-box clickable <%= (typeof roleFilter !== 'undefined' && roleFilter === 'probationary') ? 'active-filter' : '' %>" title="Click to filter probationary users">
+    <span class="click-indicator">Filter ›</span>
     <div class="stat-label">Probationary / Asks</div>
     <div class="stat-value" style="color:#f59e0b;"><%= probationary %></div>
     <div class="stat-sub">Progressive asks pending</div>
-  </div>
-  <div class="stat-box">
+  </a>
+
+  <a href="/onboarding/?role=blocked&limit=<%= typeof pageSize !== 'undefined' ? pageSize : 50 %>" class="stat-box clickable <%= (typeof roleFilter !== 'undefined' && roleFilter === 'blocked') ? 'active-filter' : '' %>" title="Click to filter blocked users">
+    <span class="click-indicator">Filter ›</span>
     <div class="stat-label">Blocked / Bot Traps</div>
-    <div class="stat-value" style="color:#ef4444;"><%= typeof blocked !== 'undefined' ? blocked : 400 %></div>
+    <div class="stat-value" style="color:#ef4444;"><%= typeof blocked !== 'undefined' ? blocked : 401 %></div>
     <div class="stat-sub">Spam patterns &amp; fake emails</div>
-  </div>
+  </a>
 </div>
 
-<div class="two-col" style="grid-template-columns: 320px 1fr;">
+<div class="two-col" style="grid-template-columns: 310px 1fr;">
 
-  <!-- Register Form -->
-  <div class="card" style="height:fit-content;">
-    <div class="card-title">Evaluate New Registration</div>
-    <p style="font-size:0.78rem; color:var(--muted); margin-bottom:1rem;">
-      Test registration heuristcs against spam domains, disposable emails, and bot patterns.
-    </p>
-
-    <form method="post">
-      <input type="hidden" name="action" value="register_user">
-      <div class="form-group">
-        <label class="form-label">WP User ID</label>
-        <input type="number" name="wp_user_id" class="form-control" value="5001" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Username</label>
-        <input type="text" name="username" class="form-control" placeholder="e.g. alex_reviewer" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Email</label>
-        <input type="email" name="email" class="form-control" placeholder="user@gmail.com" required>
-      </div>
-      <button type="submit" class="btn btn-primary btn-full">Evaluate &amp; Register</button>
-    </form>
-
-    <div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border);">
-      <div style="font-size:0.8rem; font-weight:600; color:#fff; margin-bottom:0.5rem;">WordPress Sync</div>
-      <p style="font-size:0.75rem; color:var(--muted); margin-bottom:0.75rem;">
-        Ingests all 4,000 WordPress users, evaluates risk heuristics, and establishes role progression.
+  <!-- Left: Register Form & Sync Card -->
+  <div>
+    <div class="card" style="height:fit-content; margin-bottom:1.25rem;">
+      <div class="card-title">Evaluate New Registration</div>
+      <p style="font-size:0.78rem; color:var(--muted); margin-bottom:1rem;">
+        Test registration heuristics against spam domains, disposable emails, and bot patterns.
       </p>
+
       <form method="post">
-        <input type="hidden" name="action" value="sync_wp_users">
-        <button type="submit" class="btn btn-secondary btn-full btn-sm">
-          📥 Re-Sync 4,000 WP Users
+        <input type="hidden" name="action" value="register_user">
+        <div class="form-group">
+          <label class="form-label">WP User ID</label>
+          <input type="number" name="wp_user_id" class="form-control" value="5001" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input type="text" name="username" class="form-control" placeholder="e.g. alex_reviewer" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" placeholder="user@gmail.com" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Evaluate &amp; Register</button>
+      </form>
+    </div>
+
+    <!-- Live Database & SMTP Automation Sync Card -->
+    <div class="card" style="background:rgba(26,29,39,0.9); border:1px solid var(--border);">
+      <div class="card-title" style="color:#fff; font-size:0.85rem;">⚡ Database Automation &amp; SMTP</div>
+      <p style="font-size:0.75rem; color:var(--muted); margin-bottom:0.75rem;">
+        Executing the onboarding batch writes updates directly into your MySQL database table <code>user_onboarding_states</code> and emails the full report to <code>test@appflicks.com</code>.
+      </p>
+      <form method="post" style="margin-bottom:0.5rem;">
+        <input type="hidden" name="action" value="run_onboarding_batch">
+        <button type="submit" class="btn btn-primary btn-full btn-sm">
+          ⚡ Run Batch &amp; Email Report
         </button>
       </form>
+      <a href="/smtp-settings/" class="btn btn-secondary btn-full btn-sm" style="text-align:center;">
+        ⚙️ SMTP Mail Settings
+      </a>
     </div>
   </div>
 
-  <!-- Users Table with Search & Pagination -->
+  <!-- Right: Users Table with Search, Filter & "View All" -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-bottom:1rem;">
       <div>
-        <div class="card-title" style="margin-bottom:0.2rem;">WordPress Users Directory (<%= typeof totalFiltered !== 'undefined' ? totalFiltered : total_users %>)</div>
+        <div class="card-title" style="margin-bottom:0.2rem; display:flex; align-items:center; gap:0.5rem;">
+          <span>WordPress Users Directory</span>
+          <span class="badge badge-blue">(<%= typeof totalFiltered !== 'undefined' ? totalFiltered : total_users %>)</span>
+          <% if (typeof roleFilter !== 'undefined' && roleFilter !== 'all') { %>
+            <span class="badge badge-<%= roleFilter === 'trusted' ? 'green' : (roleFilter === 'probationary' ? 'amber' : 'red') %>">
+              Filtered: <%= roleFilter.toUpperCase() %>
+            </span>
+          <% } %>
+        </div>
         <div style="font-size:0.75rem; color:var(--muted);">
           Page <%= typeof currentPage !== 'undefined' ? currentPage : 1 %> of <%= typeof totalPages !== 'undefined' ? totalPages : 1 %>
+          &bull; <span style="color:#10b981;">💡 Click on any user row to view details &amp; actions</span>
         </div>
       </div>
 
-      <!-- Search & Filters -->
+      <!-- Controls: View All, Page Size, Search & Filters -->
       <form method="get" action="/onboarding/" style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
-        <input type="text" name="q" value="<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" placeholder="Search username, email..." class="form-control" style="width:180px; padding:4px 8px; font-size:0.78rem;">
-        <select name="role" class="form-control" style="padding:4px 8px; font-size:0.78rem; width:130px;" onchange="this.form.submit()">
-          <option value="all" <%= (typeof roleFilter !== 'undefined' && roleFilter === 'all') ? 'selected' : '' %>>All Roles</option>
-          <option value="trusted" <%= (typeof roleFilter !== 'undefined' && roleFilter === 'trusted') ? 'selected' : '' %>>Trusted (<%= trusted_users %>)</option>
-          <option value="probationary" <%= (typeof roleFilter !== 'undefined' && roleFilter === 'probationary') ? 'selected' : '' %>>Probationary (<%= probationary %>)</option>
-          <option value="blocked" <%= (typeof roleFilter !== 'undefined' && roleFilter === 'blocked') ? 'selected' : '' %>>Blocked (<%= typeof blocked !== 'undefined' ? blocked : 400 %>)</option>
+        <input type="hidden" name="role" value="<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>">
+
+        <!-- Search Box -->
+        <input type="text" name="q" value="<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" placeholder="Search username, email, ID..." class="form-control" style="width:160px; padding:4px 8px; font-size:0.78rem;">
+
+        <!-- Page Size Dropdown -->
+        <select name="limit" class="form-control" style="padding:4px 8px; font-size:0.78rem; width:95px;" onchange="this.form.submit()">
+          <option value="50" <%= (typeof pageSize !== 'undefined' && pageSize === 50) ? 'selected' : '' %>>50 / page</option>
+          <option value="100" <%= (typeof pageSize !== 'undefined' && pageSize === 100) ? 'selected' : '' %>>100 / page</option>
+          <option value="250" <%= (typeof pageSize !== 'undefined' && pageSize === 250) ? 'selected' : '' %>>250 / page</option>
+          <option value="500" <%= (typeof pageSize !== 'undefined' && pageSize === 500) ? 'selected' : '' %>>500 / page</option>
+          <option value="all" <%= (typeof pageSize !== 'undefined' && pageSize >= 4000) ? 'selected' : '' %>>All (4000)</option>
         </select>
-        <button type="submit" class="btn btn-secondary btn-sm" style="padding:4px 10px;">Search</button>
-        <% if (typeof searchQuery !== 'undefined' && searchQuery) { %>
-          <a href="/onboarding/" class="btn btn-secondary btn-sm" style="padding:4px 8px;">✕</a>
+
+        <button type="submit" class="btn btn-secondary btn-sm" style="padding:4px 8px;">Search</button>
+
+        <% if ((typeof searchQuery !== 'undefined' && searchQuery) || (typeof roleFilter !== 'undefined' && roleFilter !== 'all')) { %>
+          <a href="/onboarding/?role=all" class="btn btn-secondary btn-sm" title="Clear all filters">Reset</a>
+        <% } %>
+
+        <% if (typeof pageSize === 'undefined' || pageSize < 4000) { %>
+          <a href="/onboarding/?role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&limit=all" class="btn btn-secondary btn-sm" style="border-color:var(--accent); color:#a5b4fc;" title="View all users in one screen">
+            👁️ View All
+          </a>
         <% } %>
       </form>
     </div>
@@ -123,11 +164,14 @@
         </thead>
         <tbody>
           <% users.forEach(function(u) { %>
-          <tr>
+          <tr class="clickable-row" onclick="inspectUserRow(<%= u.id %>)" id="user-row-<%= u.id %>">
             <td style="font-family:monospace; font-size:0.75rem; color:var(--muted);">#<%= u.wp_user_id %></td>
             <td>
-              <strong style="color:#fff;"><%= u.username %></strong>
-              <div style="font-size:0.72rem; color:var(--muted);"><%= u.email %></div>
+              <div style="display:flex; align-items:center; gap:0.4rem;">
+                <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:<%= u.assigned_role.includes('trusted') ? '#10b981' : (u.assigned_role.includes('blocked') ? '#ef4444' : '#f59e0b') %>;"></span>
+                <strong style="color:#fff;"><%= u.username %></strong>
+              </div>
+              <div style="font-size:0.72rem; color:var(--muted); margin-left:14px;"><%= u.email %></div>
             </td>
             <td>
               <span class="badge badge-<%= u.risk_score > 0.5 ? 'red' : (u.risk_score > 0.2 ? 'amber' : 'green') %>">
@@ -138,7 +182,7 @@
               <span class="badge badge-blue" style="font-size:0.7rem;"><%= u.onboarding_stage %></span>
             </td>
             <td style="font-size:0.78rem;">
-              <span style="color:<%= u.assigned_role.includes('trusted') ? '#10b981' : (u.assigned_role.includes('blocked') ? '#ef4444' : '#f59e0b') %>;">
+              <span style="color:<%= u.assigned_role.includes('trusted') ? '#10b981' : (u.assigned_role.includes('blocked') ? '#ef4444' : '#f59e0b') %>; font-weight:600;">
                 <%= u.assigned_role %>
               </span>
             </td>
@@ -149,14 +193,19 @@
                 <span class="badge badge-red">No</span>
               <% } %>
             </td>
-            <td>
-              <form method="post" style="display:flex; gap:0.25rem; align-items:center;">
-                <input type="hidden" name="action" value="update_asks">
-                <input type="hidden" name="user_id" value="<%= u.id %>">
-                <label style="font-size:0.68rem; margin:0; display:flex; align-items:center; gap:2px; color:var(--muted);">
-                  <input type="checkbox" name="email_verified" <%= u.email_verified ? 'checked' : '' %> onchange="this.form.submit()"> Verified
-                </label>
-              </form>
+            <td onclick="event.stopPropagation()">
+              <div style="display:flex; gap:0.35rem; align-items:center;">
+                <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.7rem;" onclick="inspectUserRow(<%= u.id %>)">
+                  👁️ Inspect
+                </button>
+                <form method="post" style="margin:0; display:inline;">
+                  <input type="hidden" name="action" value="update_asks">
+                  <input type="hidden" name="user_id" value="<%= u.id %>">
+                  <label style="font-size:0.68rem; margin:0; display:inline-flex; align-items:center; gap:2px; color:var(--muted); cursor:pointer;">
+                    <input type="checkbox" name="email_verified" <%= u.email_verified ? 'checked' : '' %> onchange="this.form.submit()"> Verified
+                  </label>
+                </form>
+              </div>
             </td>
           </tr>
           <% }); %>
@@ -164,22 +213,30 @@
       </table>
     </div>
 
-    <!-- Pagination Controls -->
-    <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border);">
+    <!-- Pagination Controls (only shown if not viewing all) -->
+    <% if (typeof totalPages !== 'undefined' && totalPages > 1 && (typeof pageSize === 'undefined' || pageSize < 4000)) { %>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border);">
         <div style="font-size:0.78rem; color:var(--muted);">
           Showing <%= ((currentPage - 1) * pageSize) + 1 %> - <%= Math.min(currentPage * pageSize, totalFiltered) %> of <%= totalFiltered %> users
         </div>
-        <div style="display:flex; gap:0.4rem;">
+        <div style="display:flex; gap:0.35rem; align-items:center;">
           <% if (currentPage > 1) { %>
-            <a href="?page=1&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">« First</a>
-            <a href="?page=<%= currentPage - 1 %>&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">‹ Prev</a>
+            <a href="?page=1&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&limit=<%= pageSize %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">« First</a>
+            <a href="?page=<%= currentPage - 1 %>&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&limit=<%= pageSize %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">‹ Prev</a>
           <% } %>
-          <span style="font-size:0.8rem; padding:4px 8px; color:#fff;">Page <%= currentPage %> / <%= totalPages %></span>
+
+          <span style="font-size:0.8rem; padding:4px 8px; color:#fff; font-weight:600;">
+            Page <%= currentPage %> / <%= totalPages %>
+          </span>
+
           <% if (currentPage < totalPages) { %>
-            <a href="?page=<%= currentPage + 1 %>&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">Next ›</a>
-            <a href="?page=<%= totalPages %>&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">Last »</a>
+            <a href="?page=<%= currentPage + 1 %>&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&limit=<%= pageSize %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">Next ›</a>
+            <a href="?page=<%= totalPages %>&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&limit=<%= pageSize %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">Last »</a>
           <% } %>
+
+          <a href="?role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&limit=all" class="btn btn-primary btn-sm" style="margin-left:0.5rem;">
+            👁️ View All (4,000)
+          </a>
         </div>
       </div>
     <% } %>
@@ -197,5 +254,173 @@
   </div>
 
 </div>
+
+<!-- High-Fidelity User Profile & Governance Inspector Modal -->
+<div id="user-inspector-modal" class="modal-overlay" onclick="closeUserModal(event)">
+  <div class="modal-container" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modal-user-title">
+        <span>👤 User Profile Inspector</span>
+        <span id="modal-user-badge" class="badge badge-green">#101</span>
+      </h3>
+      <button type="button" class="modal-close" onclick="closeUserModal()">×</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Profile Header Summary -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.25rem; padding-bottom:1rem; border-bottom:1px solid var(--border);">
+        <div>
+          <h2 id="modal-username" style="font-size:1.2rem; color:#fff; margin-bottom:2px;">alex_critic</h2>
+          <div id="modal-email" style="font-size:0.85rem; color:var(--muted);">alex.critic@example.com</div>
+          <div style="font-size:0.75rem; color:var(--muted); margin-top:4px;">
+            Registered: <span id="modal-created-at" style="color:#fff;">2026-09-01 10:00</span>
+            &bull; Location: <span id="modal-location" style="color:#fff;">US</span>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:0.7rem; color:var(--muted); text-transform:uppercase;">Registration Risk</div>
+          <div id="modal-risk-badge" class="badge badge-green" style="font-size:1.1rem; padding:4px 10px; margin-top:2px;">0.05</div>
+        </div>
+      </div>
+
+      <!-- Governance & Onboarding State -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1rem;">
+        <div style="background:rgba(0,0,0,0.25); padding:0.75rem; border-radius:6px; border:1px solid var(--border);">
+          <div style="font-size:0.7rem; color:var(--muted); text-transform:uppercase;">Assigned Role</div>
+          <div id="modal-role" style="font-weight:700; color:#10b981; font-size:0.95rem; margin-top:2px;">subscriber_trusted</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.25); padding:0.75rem; border-radius:6px; border:1px solid var(--border);">
+          <div style="font-size:0.7rem; color:var(--muted); text-transform:uppercase;">Onboarding Stage</div>
+          <div id="modal-stage" style="font-weight:700; color:#818cf8; font-size:0.95rem; margin-top:2px;">completed</div>
+        </div>
+      </div>
+
+      <!-- Permissions Checklist -->
+      <div style="background:rgba(0,0,0,0.2); padding:0.75rem; border-radius:6px; border:1px solid var(--border); margin-bottom:1rem;">
+        <div style="font-size:0.75rem; font-weight:600; color:#fff; margin-bottom:0.5rem;">Access Capabilities:</div>
+        <div style="display:flex; gap:1rem; font-size:0.8rem;">
+          <span id="perm-post" style="color:#10b981;">✓ Publish Reviews / Posts</span>
+          <span id="perm-comment" style="color:#10b981;">✓ Post Comments</span>
+          <span id="perm-vote" style="color:#10b981;">✓ Community Voting</span>
+        </div>
+      </div>
+
+      <!-- Risk Diagnostics Breakdown -->
+      <div style="margin-bottom:1.25rem;">
+        <div style="font-size:0.75rem; font-weight:600; color:#fff; margin-bottom:0.35rem;">Risk Heuristics Evaluation:</div>
+        <div id="modal-risk-details" style="font-size:0.78rem; color:var(--muted); background:#0c0e14; padding:0.75rem; border-radius:6px; border:1px solid var(--border);">
+          Verified domain. No spam signatures detected. Standard consumer ISP routing.
+        </div>
+      </div>
+
+      <!-- Action Forms: Role Promotion & Database Sync -->
+      <form method="post" id="modal-action-form" style="margin-bottom:1rem;">
+        <input type="hidden" name="action" value="update_user_role">
+        <input type="hidden" name="user_id" id="modal-input-user-id" value="">
+
+        <div style="font-size:0.75rem; font-weight:600; color:#fff; margin-bottom:0.4rem;">
+          Change Governance Role &amp; Sync to Database (<code style="color:#10b981;">learnami_ttest.user_onboarding_states</code>):
+        </div>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <button type="submit" name="new_role" value="subscriber_trusted" class="btn btn-secondary btn-sm" style="color:#10b981; border-color:rgba(16,185,129,0.3);">
+            ✓ Set Trusted Subscriber
+          </button>
+          <button type="submit" name="new_role" value="subscriber_probationary" class="btn btn-secondary btn-sm" style="color:#f59e0b; border-color:rgba(245,158,11,0.3);">
+            ⏳ Set Probationary
+          </button>
+          <button type="submit" name="new_role" value="restricted_blocked" class="btn btn-danger btn-sm">
+            🚫 Block / Flag Bot
+          </button>
+        </div>
+      </form>
+
+      <!-- Quick Email Notification via SMTP -->
+      <div style="padding-top:0.85rem; border-top:1px solid var(--border);">
+        <div style="font-size:0.75rem; font-weight:600; color:#fff; margin-bottom:0.4rem;">
+          ✉️ Send Direct Notification via SMTP (<code>mail.appflicks.com:465</code>):
+        </div>
+        <form method="post" action="/onboarding/">
+          <input type="hidden" name="action" value="send_user_email">
+          <input type="hidden" name="target_user_id" id="modal-email-target-id" value="">
+          <div style="display:flex; gap:0.4rem;">
+            <input type="text" name="email_subject" value="AppFlicks Onboarding Update &amp; Verification" class="form-control" style="font-size:0.78rem;" placeholder="Subject">
+            <button type="submit" class="btn btn-secondary btn-sm" style="white-space:nowrap;">
+              ✉️ Send Email
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="closeUserModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Keep local map of users for instantaneous modal view
+const allUsersStore = <%- JSON.stringify(users) %>;
+
+function inspectUserRow(userId) {
+  const user = allUsersStore.find(u => u.id === userId || u.wp_user_id === userId);
+  if (!user) return;
+
+  document.getElementById('modal-user-badge').innerText = '#' + user.wp_user_id;
+  document.getElementById('modal-username').innerText = user.username;
+  document.getElementById('modal-email').innerText = user.email;
+  document.getElementById('modal-created-at').innerText = user.created_at || 'Recently';
+  document.getElementById('modal-location').innerText = user.location || 'US';
+
+  const riskBadge = document.getElementById('modal-risk-badge');
+  const score = Number(user.risk_score || 0).toFixed(2);
+  riskBadge.innerText = score;
+  riskBadge.className = 'badge badge-' + (score > 0.5 ? 'red' : (score > 0.2 ? 'amber' : 'green'));
+
+  const roleEl = document.getElementById('modal-role');
+  roleEl.innerText = user.assigned_role;
+  roleEl.style.color = user.assigned_role.includes('trusted') ? '#10b981' : (user.assigned_role.includes('blocked') ? '#ef4444' : '#f59e0b');
+
+  document.getElementById('modal-stage').innerText = user.onboarding_stage;
+
+  // Permissions
+  const permPost = document.getElementById('perm-post');
+  permPost.innerHTML = user.can_post ? '<span style="color:#10b981;">✓ Publish Reviews / Posts</span>' : '<span style="color:#ef4444;">✗ Publish Disabled</span>';
+
+  const permComment = document.getElementById('perm-comment');
+  permComment.innerHTML = user.can_comment ? '<span style="color:#10b981;">✓ Post Comments</span>' : '<span style="color:#ef4444;">✗ Comments Restricted</span>';
+
+  // Risk diagnostics
+  const detailsEl = document.getElementById('modal-risk-details');
+  if (user.assigned_role.includes('blocked') || user.risk_score > 0.5) {
+    detailsEl.innerHTML = '<span style="color:#ef4444;">⚠️ High risk detected:</span> Disposable email pattern or blacklisted bot keyword identified. Automated block applied.';
+  } else if (user.assigned_role.includes('probationary')) {
+    detailsEl.innerHTML = '<span style="color:#f59e0b;">⏳ Progressive asks required:</span> Email verification and avatar upload pending before elevated role is granted.';
+  } else {
+    detailsEl.innerHTML = '<span style="color:#10b981;">✓ Clean registration signature:</span> Standard consumer domain verified. Zero spam signals. Full trusted rights active.';
+  }
+
+  // Set form inputs
+  document.getElementById('modal-input-user-id').value = user.id;
+  document.getElementById('modal-email-target-id').value = user.id;
+
+  // Open modal
+  const modal = document.getElementById('user-inspector-modal');
+  modal.classList.add('open');
+}
+
+function closeUserModal(e) {
+  if (e && e.target && e.target.closest('.modal-container') && !e.target.classList.contains('modal-close')) {
+    return;
+  }
+  const modal = document.getElementById('user-inspector-modal');
+  modal.classList.remove('open');
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeUserModal();
+});
+</script>
 
 <%- include('footer') %>

@@ -1,0 +1,222 @@
+<%- include('header') %>
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div>
+    <h1 class="page-title" style="margin-bottom:0.25rem;">SMTP Email &amp; Automation Notifications</h1>
+    <p class="page-sub" style="margin-bottom:0;">Configure outgoing mail server for live user alerts, bot traps &amp; batch automation reports.</p>
+  </div>
+  <div style="display:flex; gap:0.5rem;">
+    <a href="/onboarding/" class="btn btn-secondary btn-sm">👥 Onboarding Directory</a>
+    <a href="/" class="btn btn-secondary btn-sm">← Dashboard</a>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- SMTP Configuration Form -->
+  <div class="card">
+    <div class="card-title">SMTP Server Configuration (SSL/TLS)</div>
+    <p style="font-size:0.8rem; color:var(--muted); margin-bottom:1rem;">
+      Configured using your provided secure mail server specifications.
+    </p>
+
+    <!-- Test Result Display -->
+    <div id="smtp-test-result" class="result-box <%= (typeof test_result !== 'undefined' && test_result && test_result.sent) ? 'ok' : 'fail' %>" style="<%= (typeof test_result !== 'undefined' && test_result) ? '' : 'display:none;' %>">
+      <% if (typeof test_result !== 'undefined' && test_result) { %>
+        <%= test_result.message %>
+      <% } %>
+    </div>
+
+    <form method="post" id="smtp-form" style="margin-top:0.75rem;">
+      <input type="hidden" name="action" value="save_smtp">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Outgoing Server (SMTP)</label>
+          <input type="text" id="smtp-host" name="host" class="form-control" value="<%= smtp_cfg.host || 'mail.appflicks.com' %>" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">SMTP Port</label>
+          <input type="number" id="smtp-port" name="port" class="form-control" value="<%= smtp_cfg.port || 465 %>" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Username (Email Address)</label>
+        <input type="email" id="smtp-user" name="user" class="form-control" value="<%= smtp_cfg.user || 'test@appflicks.com' %>" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email Password</label>
+        <input type="password" id="smtp-pass" name="pass" class="form-control" placeholder="<%= smtp_cfg.pass ? '••••••••••••' : 'Enter email account password' %>" value="<%= smtp_cfg.pass || '' %>">
+        <small style="color:var(--muted); font-size:0.72rem; margin-top:3px; display:block;">
+          Enter the password for <code>test@appflicks.com</code> to authenticate outgoing mail.
+        </small>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Recipient for Automation Reports</label>
+        <input type="email" id="smtp-recipient" name="recipient" class="form-control" value="<%= smtp_cfg.recipient || 'test@appflicks.com' %>" required>
+      </div>
+
+      <div class="form-group" style="background:rgba(0,0,0,0.25); padding:0.75rem; border-radius:6px; border:1px solid var(--border);">
+        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; color:#fff; margin-bottom:0.5rem; cursor:pointer;">
+          <input type="checkbox" name="notify_on_batch" <%= smtp_cfg.notify_on_batch !== false ? 'checked' : '' %>>
+          Send full report to <code>test@appflicks.com</code> on Batch Automation runs
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; color:#fff; margin:0; cursor:pointer;">
+          <input type="checkbox" name="notify_on_block" <%= smtp_cfg.notify_on_block !== false ? 'checked' : '' %>>
+          Send immediate alert when high-risk bot or disposable email is blocked
+        </label>
+      </div>
+
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+        <button type="submit" class="btn btn-primary">
+          💾 Save SMTP Settings
+        </button>
+        <button type="button" id="btn-test-email" onclick="testSmtpConnection()" class="btn btn-secondary">
+          ⚡ Send Test Email to test@appflicks.com
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Status & Server Specs Guide -->
+  <div>
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <div class="card-title" style="margin-bottom:0;">Live SMTP Status</div>
+        <span class="badge <%= (smtp_cfg.pass && smtp_cfg.pass.length > 0) ? 'badge-green' : 'badge-amber' %>" id="smtp-badge">
+          <%= (smtp_cfg.pass && smtp_cfg.pass.length > 0) ? '● Ready to Dispatch' : '● Password Required' %>
+        </span>
+      </div>
+
+      <table>
+        <tr>
+          <td style="color:var(--muted); width:35%;">Protocol</td>
+          <td><strong style="color:#fff;">SSL / TLS (Port 465)</strong></td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Outgoing Host</td>
+          <td><code style="color:#fff;"><%= smtp_cfg.host || 'mail.appflicks.com' %></code></td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Sender / User</td>
+          <td><code style="color:#10b981;"><%= smtp_cfg.user || 'test@appflicks.com' %></code></td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Notification Target</td>
+          <td><code style="color:#6366f1;"><%= smtp_cfg.recipient || 'test@appflicks.com' %></code></td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Password Set</td>
+          <td>
+            <% if (smtp_cfg.pass && smtp_cfg.pass.length > 0) { %>
+              <span class="badge badge-green">✓ Saved</span>
+            <% } else { %>
+              <span class="badge badge-amber">⚠️ Enter Password</span>
+            <% } %>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="color:#10b981;">Incoming &amp; Outgoing Reference</div>
+      <table style="font-size:0.78rem;">
+        <tr>
+          <td style="color:var(--muted);">Incoming (IMAP)</td>
+          <td>mail.appflicks.com (Port 993 SSL)</td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Incoming (POP3)</td>
+          <td>mail.appflicks.com (Port 995 SSL)</td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Outgoing (SMTP)</td>
+          <td>mail.appflicks.com (Port 465 SSL)</td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Authentication</td>
+          <td>Required (test@appflicks.com)</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Quick Run Automation & Email Card -->
+    <div class="card" style="background:rgba(99,102,241,0.06); border-color:rgba(99,102,241,0.25);">
+      <div class="card-title" style="color:#a5b4fc;">⚡ Trigger Automation &amp; Email</div>
+      <p style="font-size:0.78rem; color:var(--muted); margin-bottom:0.75rem;">
+        Run the onboarding batch on your database now and receive the execution report directly in your inbox at <code>test@appflicks.com</code>.
+      </p>
+      <form method="post" action="/onboarding/">
+        <input type="hidden" name="action" value="run_onboarding_batch">
+        <button type="submit" class="btn btn-primary btn-full btn-sm">
+          ⚡ Run Batch &amp; Email Report Now
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+async function testSmtpConnection() {
+  const btn = document.getElementById('btn-test-email');
+  const resBox = document.getElementById('smtp-test-result');
+  const host = document.getElementById('smtp-host').value.trim();
+  const port = document.getElementById('smtp-port').value.trim();
+  const user = document.getElementById('smtp-user').value.trim();
+  const pass = document.getElementById('smtp-pass').value;
+  const recipient = document.getElementById('smtp-recipient').value.trim();
+
+  btn.disabled = true;
+  btn.innerText = 'Connecting to mail.appflicks.com:465...';
+
+  resBox.style.display = 'block';
+  resBox.className = 'result-box';
+  resBox.style.background = 'rgba(245,158,11,0.1)';
+  resBox.style.borderColor = 'rgba(245,158,11,0.3)';
+  resBox.style.color = '#f59e0b';
+  resBox.innerHTML = '⏳ Establishing SSL/TLS connection to mail.appflicks.com:465 and authenticating...';
+
+  try {
+    const res = await fetch('/api/smtp/test/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host, port, user, pass, recipient })
+    });
+    const data = await res.json();
+
+    if (data.sent) {
+      resBox.className = 'result-box ok';
+      resBox.style.background = '';
+      resBox.style.borderColor = '';
+      resBox.style.color = '';
+      resBox.innerHTML = '✓ <strong>Email Sent Successfully!</strong> ' + data.message;
+      const badge = document.getElementById('smtp-badge');
+      if (badge) {
+        badge.className = 'badge badge-green';
+        badge.innerText = '● Live SMTP Verified';
+      }
+    } else {
+      resBox.className = 'result-box fail';
+      resBox.style.background = '';
+      resBox.style.borderColor = '';
+      resBox.style.color = '';
+      resBox.innerHTML = '⚠️ <strong>SMTP Test Notice:</strong> ' + data.message;
+    }
+  } catch (err) {
+    resBox.className = 'result-box fail';
+    resBox.style.background = '';
+    resBox.style.borderColor = '';
+    resBox.style.color = '';
+    resBox.innerHTML = '✗ <strong>Error:</strong> ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '⚡ Send Test Email to test@appflicks.com';
+  }
+}
+</script>
+
+<%- include('footer') %>

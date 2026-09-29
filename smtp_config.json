@@ -1,0 +1,12 @@
+{
+  "host": "mail.appflicks.com",
+  "port": 465,
+  "secure": true,
+  "user": "test@appflicks.com",
+  "pass": "",
+  "from": "\"AppFlicks Automation\" <test@appflicks.com>",
+  "recipient": "test@appflicks.com",
+  "notify_on_batch": true,
+  "notify_on_block": true,
+  "enabled": true
+}

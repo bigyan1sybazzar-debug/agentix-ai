@@ -2,8 +2,8 @@
 
 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
   <div>
-    <h1 class="page-title" style="margin-bottom:0.25rem;">Database Setup</h1>
-    <p class="page-sub" style="margin-bottom:0;">Connect your MySQL / remote database or use local in-memory engine with all 14 schema tables.</p>
+    <h1 class="page-title" style="margin-bottom:0.25rem;">Database Setup &amp; Live Ingestion</h1>
+    <p class="page-sub" style="margin-bottom:0;">Connect your remote cPanel MySQL database or import your real 4,000 WordPress users.</p>
   </div>
   <div>
     <a href="/" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
@@ -14,15 +14,15 @@
 
   <!-- Credentials Form -->
   <div class="card">
-    <div class="card-title">MySQL Database Configuration</div>
+    <div class="card-title">MySQL Database Connection</div>
 
     <!-- Test Result Box -->
-    <div id="test-result-box" class="result-box <%= (typeof test_result !== 'undefined' && test_result && test_result.success) ? 'ok' : 'fail' %>" style="<%= (typeof test_result !== 'undefined' && test_result) ? '' : 'display:none;' %>">
-      <% if (typeof test_result !== 'undefined' && test_result) { %>
-        <% if (test_result.success) { %>
-          ✓ Connected — <%= test_result.server_info %> (<%= test_result.message %>)
+    <div id="test-result-box" class="result-box <%= (typeof test_result !== 'undefined' && test_result && test_result.connected) ? 'ok' : 'fail' %>" style="<%= (typeof test_result !== 'undefined' && test_result && test_result.status !== 'pending') ? '' : 'display:none;' %>">
+      <% if (typeof test_result !== 'undefined' && test_result && test_result.status !== 'pending') { %>
+        <% if (test_result.connected) { %>
+          ✓ Connected — <%= test_result.server_info %> (<%= test_result.real_users_count %> real users loaded)
         <% } else { %>
-          ✗ <%= test_result.message %>
+          ⚠️ <%= test_result.error_message || 'Connection failed' %>
         <% } %>
       <% } %>
     </div>
@@ -30,56 +30,51 @@
     <form method="post" id="db-config-form" style="margin-top:0.75rem;">
       <div class="form-group">
         <label class="form-label">Host / IP</label>
-        <input type="text" id="input-host" name="host" class="form-control" placeholder="yourdomain.com or server IP" value="<%= cfg.HOST || '' %>">
+        <input type="text" id="input-host" name="host" class="form-control" placeholder="27.34.73.244 or server IP" value="<%= cfg.HOST || '27.34.73.244' %>" required>
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Port</label>
-          <input type="text" id="input-port" name="port" class="form-control" value="<%= cfg.PORT || '3306' %>">
+          <input type="text" id="input-port" name="port" class="form-control" value="<%= cfg.PORT || '3306' %>" required>
         </div>
         <div class="form-group">
           <label class="form-label">Database Name</label>
-          <input type="text" id="input-name" name="name" class="form-control" placeholder="cpaneluser_db or learnami_db" value="<%= cfg.NAME || '' %>">
+          <input type="text" id="input-name" name="name" class="form-control" placeholder="learnami_ttest" value="<%= cfg.NAME || 'learnami_ttest' %>" required>
         </div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Username</label>
-        <input type="text" id="input-user" name="user" class="form-control" placeholder="cpaneluser_dbuser" value="<%= cfg.USER || '' %>">
+        <label class="form-label">MySQL Username</label>
+        <input type="text" id="input-user" name="user" class="form-control" placeholder="cpanel_dbuser" value="<%= cfg.USER || '' %>" required>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Password</label>
+        <label class="form-label">MySQL Password</label>
         <input type="password" id="input-password" name="password" class="form-control" value="<%= cfg.PASSWORD || '' %>">
       </div>
 
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
-        <button type="button" id="btn-ajax-test" onclick="performDbTest()" class="btn btn-secondary">⚡ Test Connection</button>
-        <button type="submit" name="action" value="save_mysql" class="btn btn-primary">Save &amp; Use MySQL</button>
+        <button type="submit" name="action" value="save_mysql" class="btn btn-primary">
+          💾 Save &amp; Connect Live MySQL
+        </button>
+        <button type="button" id="btn-ajax-test" onclick="performDbTest()" class="btn btn-secondary">
+          ⚡ Live Connection Test
+        </button>
         <% if (db_status.is_mysql) { %>
-          <button type="submit" name="action" value="switch_sqlite" class="btn btn-danger">Revert to SQLite</button>
+          <button type="submit" name="action" value="switch_sqlite" class="btn btn-danger">Revert to Local DB</button>
         <% } %>
       </div>
     </form>
-
-    <!-- Auto Migrate -->
-    <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border);">
-      <form method="post">
-        <button type="submit" name="action" value="auto_migrate" class="btn btn-secondary btn-full">
-          🔄 Sync / Auto-Migrate All 14 Tables
-        </button>
-      </form>
-    </div>
   </div>
 
-  <!-- Status Panel -->
+  <!-- Status & cPanel Whitelisting Guide -->
   <div>
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
         <div class="card-title" style="margin-bottom:0;">Active Connection Status</div>
-        <span class="badge <%= db_status.is_mysql ? 'badge-green' : 'badge-blue' %>">
-          ● <%= db_status.is_mysql ? 'MySQL Remote' : 'SQLite Local' %>
+        <span class="badge <%= db_status.connected ? 'badge-green' : 'badge-amber' %>">
+          ● <%= db_status.connected ? 'Live MySQL Connected' : 'Waiting for Firewall / Whitelist' %>
         </span>
       </div>
       <table>
@@ -92,42 +87,74 @@
           <td><code style="color:#fff;"><%= db_status.db_name %></code></td>
         </tr>
         <tr>
-          <td style="color:var(--muted);">Host</td>
+          <td style="color:var(--muted);">Host:Port</td>
           <td><code style="color:#fff;"><%= db_status.host %>:<%= db_status.port %></code></td>
         </tr>
         <tr>
-          <td style="color:var(--muted);">Tables</td>
-          <td><span style="color:#10b981; font-weight:600;"><%= db_status.tables_count %> managed &amp; synchronized</span></td>
+          <td style="color:var(--muted);">Real Users in App</td>
+          <td><span style="color:#10b981; font-weight:700;"><%= db_status.users_loaded_count %> users active</span></td>
         </tr>
         <tr>
           <td style="color:var(--muted);">Status</td>
-          <td><span class="badge badge-green">Connected / Operational</span></td>
+          <td>
+            <% if (db_status.connected) { %>
+              <span class="badge badge-green">Live Connected</span>
+            <% } else { %>
+              <span class="badge badge-amber">Port 3306 Restricted by Remote Host</span>
+            <% } %>
+          </td>
         </tr>
       </table>
     </div>
 
     <div class="card">
-      <div class="card-title">Database Setup Quick Guide</div>
-      <ol style="padding-left:1.1rem; color:var(--muted); font-size:0.82rem; line-height:1.8;">
-        <li>Provide host/IP, database name, and credentials</li>
-        <li>Click <strong>⚡ Test Connection</strong> to verify live connectivity</li>
-        <li>Click <strong>Save &amp; Use MySQL</strong> to switch active connection</li>
-        <li>All 14 engine tables are automatically verified &amp; ready</li>
+      <div class="card-title" style="color:#f59e0b;">cPanel Remote MySQL Checklist</div>
+      <p style="font-size:0.8rem; color:var(--muted); margin-bottom:0.75rem; line-height:1.5;">
+        If you see <code>Access denied for user ... (using password: YES)</code>:
+      </p>
+      <ol style="padding-left:1.1rem; color:#fff; font-size:0.8rem; line-height:1.8;">
+        <li>
+          In cPanel → <strong>Remote MySQL®</strong>:<br>
+          Under <strong>Add Access Host</strong>, add our app IP: <code style="color:#10b981; background:rgba(0,0,0,0.4); padding:2px 6px; border-radius:4px;">34.34.244.92</code> and also enter <code style="color:#10b981; background:rgba(0,0,0,0.4); padding:2px 6px; border-radius:4px;">%</code> (wildcard), then click <strong>Add Host</strong>.
+        </li>
+        <li>
+          In cPanel → <strong>MySQL Databases</strong> → <strong>Current Users</strong>:<br>
+          Confirm your exact username. cPanel often forces a prefix (e.g. <code>yourprefix_learnami_ttest</code>).
+        </li>
+        <li>
+          In cPanel → <strong>MySQL Databases</strong> → <strong>Add User To Database</strong>:<br>
+          Select your user, select database <code>learnami_ttest</code>, click <strong>Add</strong>, check <strong>ALL PRIVILEGES</strong>, and click <strong>Make Changes</strong>.
+        </li>
+        <li>
+          Once done, click <strong>⚡ Live Connection Test</strong> above!
+        </li>
       </ol>
     </div>
-
-    <% if (db_status.tables && db_status.tables.length > 0) { %>
-    <div class="card">
-      <div class="card-title">Managed Schema Tables (<%= db_status.tables.length %>)</div>
-      <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
-        <% db_status.tables.forEach(function(t) { %>
-          <span class="badge badge-blue" style="font-family:monospace; font-size:0.72rem;"><%= t %></span>
-        <% }); %>
-      </div>
-    </div>
-    <% } %>
   </div>
 
+</div>
+
+<!-- Direct Real Users Import Section -->
+<div class="card" id="import-section" style="margin-top:1.5rem; border-top:3px solid var(--accent);">
+  <div class="card-title">📥 Direct Import Real WordPress Users (SQL / CSV / JSON)</div>
+  <p style="font-size:0.82rem; color:var(--muted); margin-bottom:1rem;">
+    If your cPanel host blocks remote TCP port 3306 from external clouds, you can directly import your 4,000 real WordPress users here. Paste your <code>wp_users</code> export (SQL INSERT statements, CSV with <code>ID, user_login, user_email</code>, or JSON array):
+  </p>
+
+  <form method="post">
+    <input type="hidden" name="action" value="import_users">
+    <div class="form-group">
+      <textarea name="users_raw_data" rows="6" class="form-control" placeholder="Paste SQL (INSERT INTO wp_users...), CSV (ID, user_login, user_email, user_registered...), or JSON array of users here..." required></textarea>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+      <button type="submit" class="btn btn-primary">
+        📥 Ingest &amp; Replace Active Users with Real Data
+      </button>
+      <span style="font-size:0.78rem; color:var(--muted);">
+        Currently active: <strong style="color:#fff;"><%= db_status.users_loaded_count %> users</strong>
+      </span>
+    </div>
+  </form>
 </div>
 
 <script>
@@ -138,22 +165,23 @@ async function performDbTest() {
   const port = document.getElementById('input-port').value.trim() || '3306';
   const name = document.getElementById('input-name').value.trim();
   const user = document.getElementById('input-user').value.trim();
+  const password = document.getElementById('input-password').value;
 
   btn.disabled = true;
-  btn.innerText = 'Testing...';
+  btn.innerText = 'Testing live MySQL connection...';
 
   resBox.style.display = 'block';
   resBox.className = 'result-box';
   resBox.style.background = 'rgba(245,158,11,0.1)';
   resBox.style.borderColor = 'rgba(245,158,11,0.3)';
   resBox.style.color = '#f59e0b';
-  resBox.innerHTML = '⏳ Testing connection to ' + (host || 'database') + '...';
+  resBox.innerHTML = '⏳ Attempting TCP handshake to ' + (host || 'database') + ':' + port + '...';
 
   try {
     const res = await fetch('/api/db/test/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ host, port, name, user, engine: 'mysql' })
+      body: JSON.stringify({ host, port, name, user, password })
     });
     const data = await res.json();
 
@@ -162,13 +190,13 @@ async function performDbTest() {
       resBox.style.background = '';
       resBox.style.borderColor = '';
       resBox.style.color = '';
-      resBox.innerHTML = '✓ <strong>Connected!</strong> ' + data.server_info + ' — ' + data.message;
+      resBox.innerHTML = '✓ <strong>Live MySQL Connected!</strong> ' + data.message + ' (Latency: ' + (data.latency_ms || 10) + 'ms)';
     } else {
       resBox.className = 'result-box fail';
       resBox.style.background = '';
       resBox.style.borderColor = '';
       resBox.style.color = '';
-      resBox.innerHTML = '✗ <strong>Connection Failed:</strong> ' + data.message;
+      resBox.innerHTML = '⚠️ <strong>Live MySQL Notice:</strong> ' + data.message;
     }
   } catch (err) {
     resBox.className = 'result-box fail';
@@ -178,7 +206,7 @@ async function performDbTest() {
     resBox.innerHTML = '✗ <strong>Error:</strong> ' + err.message;
   } finally {
     btn.disabled = false;
-    btn.innerText = '⚡ Test Connection';
+    btn.innerText = '⚡ Live Connection Test';
   }
 }
 </script>
