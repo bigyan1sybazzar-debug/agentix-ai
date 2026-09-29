@@ -1,8 +1,0 @@
-{
-  "ENGINE": "mysql",
-  "HOST": "127.0.0.1",
-  "PORT": "3306",
-  "NAME": "your_database_name",
-  "USER": "your_database_user",
-  "PASSWORD": "your_database_password"
-}

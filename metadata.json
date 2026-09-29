@@ -1,0 +1,8 @@
+{
+  "name": "Agentix AI - Learnami Automation Engine",
+  "description": "Agentix AI / Learnami: Multi-layer agent governance, content moderation, onboarding, identity resolution, vector memory RAG, and automation engine.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

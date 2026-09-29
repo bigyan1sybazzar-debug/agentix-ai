@@ -1,0 +1,125 @@
+<%- include('header') %>
+
+<h1 class="page-title">Vector Memory / RAG</h1>
+<p class="page-sub">Index documents and run semantic retrieval queries against agent memory.</p>
+
+<div class="stats-row" style="grid-template-columns:repeat(3,1fr);">
+  <div class="stat-box">
+    <div class="stat-label">Documents</div>
+    <div class="stat-value"><%= total_docs %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Embedded</div>
+    <div class="stat-value"><%= embedded_docs %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Vector Status</div>
+    <div class="stat-value"><%= embedded_docs === total_docs && total_docs > 0 ? 'Synchronized' : 'Ready' %></div>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- Index + Query Card -->
+  <div class="card">
+    <!-- Index Form -->
+    <div class="card-row">
+      <div class="card-title" style="margin-bottom:0">Index Document</div>
+      <form method="post">
+        <input type="hidden" name="action" value="embed_all">
+        <button type="submit" class="btn btn-secondary btn-sm">⚡ Embed All</button>
+      </form>
+    </div>
+    <br>
+    <form method="post">
+      <input type="hidden" name="action" value="add_document">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Doc Key</label>
+          <input type="text" name="doc_key" class="form-control" placeholder="policy_editorial_new" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">SFP Platform</label>
+          <input type="text" name="sfp_name" class="form-control" value="sfp_core">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input type="text" name="title" class="form-control" placeholder="Document title" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Content</label>
+        <textarea name="content" class="form-control" placeholder="Paste content to index..." required></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Doc Type</label>
+        <select name="doc_type" class="form-control">
+          <option value="policy">Policy</option>
+          <option value="handbook">Handbook</option>
+          <option value="review">Review Precedent</option>
+          <option value="precedent">Autonomous Precedent</option>
+        </select>
+      </div>
+      <label style="font-size:0.75rem; margin-bottom:0.75rem; display:block;">
+        <input type="checkbox" name="auto_embed" checked> Auto-embed into vector index
+      </label>
+      <button type="submit" class="btn btn-primary btn-full">Index Document</button>
+    </form>
+
+    <!-- Divider -->
+    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+      <div class="card-title">Semantic Query</div>
+      <form method="post">
+        <input type="hidden" name="action" value="search">
+        <div class="form-group">
+          <label class="form-label">Query</label>
+          <input type="text" name="query" class="form-control" placeholder="e.g. media policy dimensions or autonomous packaging" value="<%= search_query || '' %>">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Search Memory</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Results + Docs -->
+  <div>
+    <% if (typeof query_result !== 'undefined' && query_result && query_result.matches && query_result.matches.length > 0) { %>
+    <div class="card">
+      <div class="card-title">Semantic Results for "<%= search_query %>"</div>
+      <% query_result.matches.forEach(function(r) { %>
+      <div style="padding:0.6rem 0; border-bottom:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.2rem;">
+          <strong style="color:#fff; font-size:0.85rem"><%= r.title %></strong>
+          <span class="badge badge-green"><%= Number(r.similarity_score).toFixed(3) %></span>
+        </div>
+        <p style="color:var(--muted); font-size:0.78rem; margin:0;"><%= r.content.length > 140 ? r.content.substring(0, 140) + '...' : r.content %></p>
+      </div>
+      <% }); %>
+    </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-title">Indexed Documents</div>
+      <% if (documents && documents.length > 0) { %>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Title</th><th>Type</th><th>Status</th></tr></thead>
+          <tbody>
+            <% documents.forEach(function(doc) { %>
+            <tr>
+              <td style="color:#fff; font-size:0.82rem"><%= doc.title.length > 30 ? doc.title.substring(0, 30) + '...' : doc.title %></td>
+              <td><span class="badge badge-blue"><%= doc.doc_type %></span></td>
+              <td><span class="badge badge-<%= doc.vector_status === 'embedded' ? 'green' : 'amber' %>"><%= doc.vector_status %></span></td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <% } else { %>
+      <div class="empty">No documents indexed yet.</div>
+      <% } %>
+    </div>
+  </div>
+
+</div>
+
+<%- include('footer') %>

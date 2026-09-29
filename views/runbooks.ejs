@@ -1,0 +1,69 @@
+<%- include('header') %>
+
+<div class="header-banner">
+  <div>
+    <h2 style="margin:0; font-size:1.4rem;">🔧 Operational Runbooks &amp; Self-Healing Playbooks</h2>
+    <p style="margin:0.25rem 0 0 0; font-size:0.85rem; opacity:0.85;">
+      Standardized self-healing playbooks for policy errors, moderation surges, queue backups, and system outage recovery.
+    </p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+  <h3 style="margin-top:0;">Available Runbook Catalog</h3>
+  <div class="grid grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+    <% (catalog || []).forEach(function(r) { %>
+    <div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:var(--bg-input);">
+      <h4 style="margin:0 0 0.35rem 0; color:var(--accent);"><%= r.title %></h4>
+      <p style="font-size:0.8rem; color:var(--muted); margin:0 0 0.75rem 0;"><%= r.description %></p>
+      <ul style="font-size:0.75rem; padding-left:1.2rem; margin:0 0 1rem 0;">
+        <% (r.steps || []).forEach(function(step) { %>
+        <li><%= step %></li>
+        <% }); %>
+      </ul>
+      <form method="POST">
+        <input type="hidden" name="runbook_key" value="<%= r.key %>">
+        <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">Execute Runbook</button>
+      </form>
+    </div>
+    <% }); %>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+  <h3 style="margin-top:0;">Runbook Execution Audit Trail</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Runbook Key</th>
+        <th>Triggered By</th>
+        <th>Status</th>
+        <th>Steps Completed</th>
+        <th>Started At</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (executions && executions.length > 0) { %>
+        <% executions.forEach(function(ex) { %>
+        <tr>
+          <td>#<%= ex.id %></td>
+          <td><code><%= ex.runbook_key %></code></td>
+          <td><%= ex.triggered_by %></td>
+          <td>
+            <span class="badge badge-<%= ex.status === 'completed' ? 'green' : 'amber' %>">
+              <%= ex.status.toUpperCase() %>
+            </span>
+          </td>
+          <td style="font-size:0.75rem;"><%= (ex.steps_completed || []).length %> steps</td>
+          <td><%= ex.created_at %></td>
+        </tr>
+        <% }); %>
+      <% } else { %>
+        <tr><td colspan="6" style="text-align:center;">No runbook executions recorded yet.</td></tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('footer') %>

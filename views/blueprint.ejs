@@ -1,0 +1,84 @@
+<%- include('header') %>
+
+<div class="header-banner" style="display:flex; justify-content:space-between; align-items:center;">
+  <div>
+    <h2 style="margin:0; font-size:1.4rem;">🏛️ System Production Blueprint</h2>
+    <p style="margin:0.25rem 0 0 0; font-size:0.85rem; opacity:0.85;">
+      Consolidated architecture definition, deployment zones, governance core, operational core, and snapshot management.
+    </p>
+  </div>
+  <form method="POST">
+    <input type="hidden" name="snapshot_name" value="blueprint_snapshot_<%= (snapshots || []).length + 1 %>">
+    <button type="submit" class="btn btn-secondary btn-sm">📷 Take Blueprint Snapshot</button>
+  </form>
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+  <h3 style="margin-top:0;">5 Consolidated Architectural Blocks</h3>
+  <div class="grid grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+    <% if (blueprint && blueprint.consolidated_blocks) { %>
+      <% blueprint.consolidated_blocks.forEach(function(block) { %>
+      <div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:var(--bg-input);">
+        <h4 style="margin:0 0 0.5rem 0; color:var(--accent);"><%= block.name %></h4>
+        <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+          <% (block.components || []).forEach(function(comp) { %>
+          <span class="badge badge-blue" style="font-size:0.75rem;"><%= comp %></span>
+          <% }); %>
+        </div>
+      </div>
+      <% }); %>
+    <% } %>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:1.5rem; display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
+  <div class="card">
+    <h3 style="margin-top:0;">Deployment &amp; Security Zones</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Zone</th>
+          <th>Implementation Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (blueprint && blueprint.deployment_zones) { %>
+          <% Object.keys(blueprint.deployment_zones).forEach(function(zoneName) { %>
+          <tr>
+            <td><code><%= zoneName %></code></td>
+            <td><%= blueprint.deployment_zones[zoneName] %></td>
+          </tr>
+          <% }); %>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Blueprint Snapshots Audit Log</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Snapshot Name</th>
+          <th>Created At</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (snapshots && snapshots.length > 0) { %>
+          <% snapshots.forEach(function(s) { %>
+          <tr>
+            <td>#<%= s.id %></td>
+            <td><code><%= s.snapshot_name %></code></td>
+            <td><%= s.created_at %></td>
+          </tr>
+          <% }); %>
+        <% } else { %>
+          <tr><td colspan="3" style="text-align:center;">No snapshots saved.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('footer') %>

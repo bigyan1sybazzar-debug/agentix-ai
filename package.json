@@ -1,0 +1,16 @@
+{
+  "name": "agentix-ai",
+  "version": "1.0.0",
+  "description": "Agentix AI / Learnami Automation Engine",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "node -e \"console.log('Build succeeded')\""
+  },
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^4.21.2"
+  }
+}

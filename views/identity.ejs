@@ -1,0 +1,103 @@
+<%- include('header') %>
+
+<h1 class="page-title">Identity Resolution</h1>
+<p class="page-sub">Cross-site user linking, duplicate detection, and trust scoring.</p>
+
+<div class="stats-row" style="grid-template-columns:repeat(4,1fr);">
+  <div class="stat-box">
+    <div class="stat-label">Total Links</div>
+    <div class="stat-value"><%= total_candidates %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Confirmed</div>
+    <div class="stat-value"><%= confirmed %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Pending Review</div>
+    <div class="stat-value"><%= pending %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Auto Match</div>
+    <div class="stat-value">Active</div>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- Create Link Form -->
+  <div class="card">
+    <div class="card-row">
+      <div class="card-title" style="margin-bottom:0">Create Identity Candidate</div>
+      <form method="post">
+        <input type="hidden" name="action" value="run_batch">
+        <button type="submit" class="btn btn-secondary btn-sm">⚡ Run Batch</button>
+      </form>
+    </div>
+    <br>
+    <form method="post">
+      <input type="hidden" name="action" value="create_candidate">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Local User Key</label>
+          <input type="text" name="local_user_key" class="form-control" value="local_u_105" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">SFP Platform Name</label>
+          <input type="text" name="sfp_name" class="form-control" value="sfp_gaming_hub" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Candidate Global User Key</label>
+        <input type="text" name="candidate_global_user_key" class="form-control" value="global_user_9921" required>
+      </div>
+      <div style="margin-bottom:1rem; display:flex; flex-wrap:wrap; gap:0.75rem;">
+        <label style="font-size:0.75rem;"><input type="checkbox" name="email_match" checked> Email Match</label>
+        <label style="font-size:0.75rem;"><input type="checkbox" name="name_match" checked> Name Match</label>
+        <label style="font-size:0.75rem;"><input type="checkbox" name="phone_match"> Phone Match</label>
+        <label style="font-size:0.75rem;"><input type="checkbox" name="sfp_overlap" checked> SFP Overlap</label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Link &amp; Score Candidate</button>
+    </form>
+  </div>
+
+  <!-- Links Table -->
+  <div class="card">
+    <div class="card-title">Identity Candidate Records</div>
+    <% if (candidates && candidates.length > 0) { %>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Local User</th><th>Candidate Global</th><th>Score</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <% candidates.forEach(function(cand) { %>
+          <tr>
+            <td style="font-size:0.8rem"><code><%= cand.local_user_key %></code><br><small style="color:var(--muted);"><%= cand.sfp_name %></small></td>
+            <td style="font-size:0.8rem"><code><%= cand.candidate_global_user_key %></code></td>
+            <td>
+              <span class="badge badge-<%= cand.confidence_score > 0.7 ? 'green' : (cand.confidence_score > 0.4 ? 'amber' : 'red') %>">
+                <%= Number(cand.confidence_score).toFixed(2) %>
+              </span>
+            </td>
+            <td><span class="badge badge-blue"><%= cand.status %></span></td>
+            <td>
+              <form method="post" style="display:flex; gap:0.3rem;">
+                <input type="hidden" name="action" value="update_status">
+                <input type="hidden" name="candidate_id" value="<%= cand.id %>">
+                <button name="new_status" value="confirmed" class="btn btn-success btn-sm" title="Confirm Match">✓</button>
+                <button name="new_status" value="rejected" class="btn btn-danger btn-sm" title="Reject Match">✗</button>
+              </form>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <div class="empty">No identity links yet.</div>
+    <% } %>
+  </div>
+
+</div>
+
+<%- include('footer') %>

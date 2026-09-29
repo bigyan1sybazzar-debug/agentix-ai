@@ -1,6 +1,30 @@
-# Database
+# Sensitive credentials and local config
+db_config.json
+*.env
+.env
+.env.*
+
+# Local databases
+*.sqlite3
 db.sqlite3
 
-# Python cache
+# Python bytecode & cache
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE & OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store

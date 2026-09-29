@@ -1,0 +1,108 @@
+<%- include('header') %>
+
+<h1 class="page-title">Governance</h1>
+<p class="page-sub">Policy sandbox, audit log, and shared governance layer.</p>
+
+<div class="stats-row" style="grid-template-columns:repeat(3,1fr);">
+  <div class="stat-box">
+    <div class="stat-label">Audit Events</div>
+    <div class="stat-value"><%= typeof audit_count !== 'undefined' ? audit_count : (audit_logs ? audit_logs.length : 0) %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Active Policies</div>
+    <div class="stat-value"><%= typeof policy_count !== 'undefined' ? policy_count : 6 %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Violations (24h)</div>
+    <div class="stat-value"><%= typeof violations_24h !== 'undefined' ? violations_24h : 1 %></div>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- Log Governance Event / Check -->
+  <div class="card">
+    <div class="card-title">Governance Policy Check &amp; Sandbox</div>
+    <form method="post">
+      <input type="hidden" name="action" value="check_governance">
+      <div class="form-group">
+        <label class="form-label">User</label>
+        <select name="wp_user_id" class="form-control">
+          <% (users || []).forEach(function(u) { %>
+            <option value="<%= u.wp_user_id %>"><%= u.username %> (#<%= u.wp_user_id %> - <%= u.assigned_role %>)</option>
+          <% }); %>
+          <% if (!users || users.length === 0) { %>
+            <option value="101">Alex Critic (#101)</option>
+            <option value="102">Spambot 99 (#102)</option>
+          <% } %>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Action</label>
+        <select name="user_action" class="form-control">
+          <option value="publish_post">publish_post</option>
+          <option value="comment">comment</option>
+          <option value="vote">vote</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Platform Context</label>
+        <select name="platform_context" class="form-control">
+          <option value="general">general</option>
+          <option value="voters_for_truth">voters_for_truth</option>
+          <option value="editorial_review">editorial_review</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Evaluate Governance Context</button>
+    </form>
+
+    <% if (typeof check_result !== 'undefined' && check_result) { %>
+    <div style="margin-top:1rem; padding:0.75rem; background:rgba(0,0,0,0.3); border-radius:6px; border-left:3px solid <%= check_result.allowed ? '#10b981' : '#f43f5e' %>">
+      <strong style="color:<%= check_result.allowed ? '#10b981' : '#f43f5e' %>">
+        Decision: <%= check_result.allowed ? 'ALLOWED' : 'BLOCKED' %>
+      </strong>
+      <p style="font-size:0.8rem; margin:0.3rem 0 0 0; color:var(--muted);"><%= check_result.reason %></p>
+    </div>
+    <% } %>
+
+    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+      <form method="post">
+        <input type="hidden" name="action" value="run_governance_batch">
+        <button type="submit" class="btn btn-secondary btn-full">⚡ Run Governance Batch</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Audit Log Table -->
+  <div class="card">
+    <div class="card-title">Recent Audit Log</div>
+    <% if (audit_logs && audit_logs.length > 0) { %>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Event</th><th>Entity</th><th>Severity</th></tr>
+        </thead>
+        <tbody>
+          <% audit_logs.forEach(function(log) { %>
+          <tr>
+            <td style="white-space:nowrap; font-family:monospace; font-size:0.72rem"><%= log.created_at %></td>
+            <td><span class="badge badge-blue" style="font-size:0.7rem"><%= log.event_type %></span></td>
+            <td style="font-size:0.78rem"><%= log.entity_type %> #<%= log.entity_id %></td>
+            <td>
+              <span class="badge badge-<%= log.severity === 'critical' ? 'red' : (log.severity === 'high' ? 'amber' : (log.severity === 'medium' ? 'blue' : 'green')) %>">
+                <%= log.severity %>
+              </span>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <div class="empty">No governance events logged yet.</div>
+    <% } %>
+  </div>
+
+</div>
+
+<%- include('footer') %>

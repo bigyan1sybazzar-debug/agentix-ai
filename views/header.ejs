@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title : 'Learnami AutoEngine' %></title>
+  <meta name="description" content="Agentix AI / Learnami: Multi-layer agent governance, content moderation, onboarding, identity resolution, vector memory RAG, and automation engine.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <h1>⚡ Learnami</h1>
+        <small>Automation Engine</small>
+      </div>
+
+      <span class="nav-section">Main</span>
+      <a href="/" class="nav-item <%= activeNav === 'dashboard' ? 'active' : '' %>">
+        <span class="icon">◻</span> Dashboard
+      </a>
+      <a href="/db-settings/" class="nav-item <%= activeNav === 'db_settings' ? 'active' : '' %>">
+        <span class="icon">⬡</span> Database Setup
+      </a>
+
+      <span class="nav-section">Agent Layers</span>
+      <a href="/onboarding/" class="nav-item <%= activeNav === 'onboarding' ? 'active' : '' %>">
+        <span class="icon">→</span> Onboarding
+      </a>
+      <a href="/moderation/" class="nav-item <%= activeNav === 'moderation' ? 'active' : '' %>">
+        <span class="icon">→</span> Moderation
+      </a>
+      <a href="/governance/" class="nav-item <%= activeNav === 'governance' ? 'active' : '' %>">
+        <span class="icon">→</span> Governance
+      </a>
+      <a href="/policies/" class="nav-item <%= activeNav === 'policy_registry' ? 'active' : '' %>">
+        <span class="icon">→</span> Policy &amp; SFPs
+      </a>
+      <a href="/identity/" class="nav-item <%= activeNav === 'identity' ? 'active' : '' %>">
+        <span class="icon">→</span> Identity
+      </a>
+      <a href="/retrieval/" class="nav-item <%= activeNav === 'retrieval' ? 'active' : '' %>">
+        <span class="icon">→</span> Memory / RAG
+      </a>
+      <a href="/privacy/" class="nav-item <%= activeNav === 'privacy' ? 'active' : '' %>">
+        <span class="icon">→</span> Privacy &amp; Consent
+      </a>
+      <a href="/runbooks/" class="nav-item <%= activeNav === 'runbooks' ? 'active' : '' %>">
+        <span class="icon">→</span> Runbooks
+      </a>
+      <a href="/blueprint/" class="nav-item <%= activeNav === 'blueprint' ? 'active' : '' %>">
+        <span class="icon">→</span> Blueprint
+      </a>
+      <a href="/media/" class="nav-item <%= activeNav === 'media' ? 'active' : '' %>">
+        <span class="icon">→</span> Media Assistant
+      </a>
+      <a href="/analytics/" class="nav-item <%= activeNav === 'analytics' ? 'active' : '' %>">
+        <span class="icon">→</span> Analytics
+      </a>
+
+      <div class="sidebar-footer">
+        <a href="/db-settings/" class="db-badge">
+          <span class="dot <%= !db_status.is_mysql ? 'sqlite' : '' %>"></span>
+          <% if (db_status.is_mysql) { %>
+            MySQL: <%= db_status.db_name.substring(0, 14) %>
+          <% } else { %>
+            SQLite / In-Memory (Active)
+          <% } %>
+        </a>
+        <a href="/run-automation/" class="run-btn">⚡ Run All Automations</a>
+      </div>
+    </aside>
+
+    <!-- Page Content -->
+    <div class="main-content">
+      <% if (typeof messages !== 'undefined' && messages && messages.length > 0) { %>
+        <% messages.forEach(function(msg) { %>
+          <div class="alert alert-<%= msg.tags || 'info' %>">
+            <span><%= msg.text %></span>
+            <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+          </div>
+        <% }); %>
+      <% } %>

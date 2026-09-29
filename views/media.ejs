@@ -1,0 +1,113 @@
+<%- include('header') %>
+
+<h1 class="page-title">Media Assistant</h1>
+<p class="page-sub">Validate, score, and package media assets for WordPress delivery.</p>
+
+<div class="stats-row" style="grid-template-columns:repeat(4,1fr);">
+  <div class="stat-box">
+    <div class="stat-label">Total Assets</div>
+    <div class="stat-value"><%= total_candidates %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Approved</div>
+    <div class="stat-value"><%= approved_candidates %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Packaged Drafts</div>
+    <div class="stat-value"><%= drafts ? drafts.length : 0 %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Validation Engine</div>
+    <div class="stat-value">Active</div>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- Add Media Form -->
+  <div class="card">
+    <div class="card-row">
+      <div class="card-title" style="margin-bottom:0">Discover Media Candidate</div>
+      <form method="post">
+        <input type="hidden" name="action" value="run_auto_validation">
+        <button type="submit" class="btn btn-secondary btn-sm">⚡ Auto-Validate All</button>
+      </form>
+    </div>
+    <br>
+    <form method="post">
+      <input type="hidden" name="action" value="add_candidate">
+      <div class="form-group">
+        <label class="form-label">Post Target Title</label>
+        <input type="text" name="post_target_title" class="form-control" placeholder="e.g. Oppenheimer (2023) Review" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Content Type</label>
+          <select name="content_type" class="form-control">
+            <option value="film">Film Poster</option>
+            <option value="music">Album Art</option>
+            <option value="game">Game Cover</option>
+            <option value="book">Book Cover</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Media Title</label>
+          <input type="text" name="title" class="form-control" placeholder="Official Theatrical Poster" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Source URL</label>
+        <input type="url" name="source_url" class="form-control" placeholder="https://image.tmdb.org/t/p/original/poster.jpg" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Width (px)</label>
+          <input type="number" name="width" class="form-control" value="800">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Height (px)</label>
+          <input type="number" name="height" class="form-control" value="1200">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Register &amp; Validate Candidate</button>
+    </form>
+  </div>
+
+  <!-- Media Table -->
+  <div class="card">
+    <div class="card-title">Discovered Media Assets</div>
+    <% if (candidates && candidates.length > 0) { %>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Title</th><th>Type</th><th>Score</th><th>Status</th><th>Dimensions</th></tr>
+        </thead>
+        <tbody>
+          <% candidates.forEach(function(item) { %>
+          <tr>
+            <td style="font-size:0.8rem; color:#fff"><%= item.title.length > 25 ? item.title.substring(0, 25) + '...' : item.title %><br><small style="color:var(--muted);"><%= item.post_target_title %></small></td>
+            <td><span class="badge badge-blue"><%= item.content_type %></span></td>
+            <td>
+              <span class="badge badge-<%= item.quality_score > 0.7 ? 'green' : (item.quality_score > 0.4 ? 'amber' : 'red') %>">
+                <%= Number(item.quality_score).toFixed(2) %>
+              </span>
+            </td>
+            <td>
+              <span class="badge badge-<%= item.validation_status === 'approved' ? 'green' : (item.validation_status === 'rejected' ? 'red' : 'amber') %>">
+                <%= item.validation_status %>
+              </span>
+            </td>
+            <td style="font-size:0.75rem; color:var(--muted);"><%= item.width %>x<%= item.height %></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <div class="empty">No media assets yet. Add one above.</div>
+    <% } %>
+  </div>
+
+</div>
+
+<%- include('footer') %>
