@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Learnami</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body>
+  <div class="main-content" style="max-width:960px;margin:0 auto;padding:32px 24px;">
+
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-sub">System overview &amp; quick entry points.</p>
+
+    {% if messages %}
+    {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags }}">
+      <span>{{ msg }}</span>
+      <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Stats -->
+    <div class="stats-row" style="grid-template-columns:repeat(4,1fr);">
+      <div class="stat-box">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value">{{ total_users }}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Trusted</div>
+        <div class="stat-value">{{ trusted_users }}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Probationary</div>
+        <div class="stat-value">{{ probationary }}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Content Submissions</div>
+        <div class="stat-value">{{ total_submissions }}</div>
+      </div>
+    </div>
+
+    <!-- Enter / Navigate -->
+    <div class="card">
+      <div class="card-title">Enter the System</div>
+      <br>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="enter">
+        <div class="form-group">
+          <label for="target">Choose a section to enter</label>
+          <select id="target" name="target" required>
+            {% for key, url in modules.items %}
+            <option value="{{ key }}">{{ key|title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Enter →</button>
+      </form>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="two-col">
+      {% for key, url in modules.items %}
+      <div class="card">
+        <div class="card-title">{{ key|title }}</div>
+        <p class="page-sub">{{ key|title }} area of the Learnami system.</p>
+        <a href="{{ url }}" class="btn btn-secondary btn-sm">Open {{ key|title }} →</a>
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+</body>
+
+</html>

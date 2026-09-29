@@ -1,8 +1,38 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.urls import reverse
 
-from .models import UserOnboardingState
+from .models import UserOnboardingState, ContentSubmission
 from .registration_rules import evaluate_registration, evaluate_role_progression, run_automated_onboarding_batch
+
+
+def _dashboard_modules():
+    return {
+        "registration": reverse("registration"),
+        "admin": "/admin/",
+    }
+
+
+def dashboard_view(request):
+    """Main dashboard — entry point into the system."""
+    modules = _dashboard_modules()
+    if request.method == "POST" and request.POST.get("action") == "enter":
+        target = request.POST.get("target", "")
+        url = modules.get(target)
+        if url:
+            return redirect(url)
+        messages.error(request, f"Unknown section '{target}'.")
+        return redirect("dashboard")
+
+    users = UserOnboardingState.objects.all()
+    context = {
+        "modules": modules,
+        "total_users": users.count(),
+        "trusted_users": users.filter(assigned_role__icontains="trusted").count(),
+        "probationary": users.filter(assigned_role__icontains="probationary").count(),
+        "total_submissions": ContentSubmission.objects.count(),
+    }
+    return render(request, "learnami/dashboard.html", context)
 
 
 def registration_view(request):
