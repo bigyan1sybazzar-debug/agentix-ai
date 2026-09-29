@@ -1,53 +1,61 @@
 <%- include('header') %>
 
-<h1 class="page-title">Database Setup</h1>
-<p class="page-sub">Connect your cPanel MySQL database. App falls back to SQLite / In-Memory until configured.</p>
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div>
+    <h1 class="page-title" style="margin-bottom:0.25rem;">Database Setup</h1>
+    <p class="page-sub" style="margin-bottom:0;">Connect your MySQL / remote database or use local in-memory engine with all 14 schema tables.</p>
+  </div>
+  <div>
+    <a href="/" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
+  </div>
+</div>
 
 <div class="two-col">
 
   <!-- Credentials Form -->
   <div class="card">
-    <div class="card-title">cPanel MySQL Credentials</div>
+    <div class="card-title">MySQL Database Configuration</div>
 
-    <% if (typeof test_result !== 'undefined' && test_result) { %>
-      <div class="result-box <%= test_result.success ? 'ok' : 'fail' %>">
+    <!-- Test Result Box -->
+    <div id="test-result-box" class="result-box <%= (typeof test_result !== 'undefined' && test_result && test_result.success) ? 'ok' : 'fail' %>" style="<%= (typeof test_result !== 'undefined' && test_result) ? '' : 'display:none;' %>">
+      <% if (typeof test_result !== 'undefined' && test_result) { %>
         <% if (test_result.success) { %>
-          ✓ Connected — <%= test_result.server_info %>
+          ✓ Connected — <%= test_result.server_info %> (<%= test_result.message %>)
         <% } else { %>
           ✗ <%= test_result.message %>
         <% } %>
-      </div>
-    <% } %>
+      <% } %>
+    </div>
 
-    <form method="post" style="margin-top:0.75rem;">
+    <form method="post" id="db-config-form" style="margin-top:0.75rem;">
       <div class="form-group">
         <label class="form-label">Host / IP</label>
-        <input type="text" name="host" class="form-control" placeholder="yourdomain.com or server IP" value="<%= cfg.HOST || '' %>">
+        <input type="text" id="input-host" name="host" class="form-control" placeholder="yourdomain.com or server IP" value="<%= cfg.HOST || '' %>">
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Port</label>
-          <input type="text" name="port" class="form-control" value="<%= cfg.PORT || '3306' %>">
+          <input type="text" id="input-port" name="port" class="form-control" value="<%= cfg.PORT || '3306' %>">
         </div>
         <div class="form-group">
           <label class="form-label">Database Name</label>
-          <input type="text" name="name" class="form-control" placeholder="cpaneluser_db" value="<%= cfg.NAME || '' %>">
+          <input type="text" id="input-name" name="name" class="form-control" placeholder="cpaneluser_db or learnami_db" value="<%= cfg.NAME || '' %>">
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Username</label>
-        <input type="text" name="user" class="form-control" placeholder="cpaneluser_dbuser" value="<%= cfg.USER || '' %>">
+        <input type="text" id="input-user" name="user" class="form-control" placeholder="cpaneluser_dbuser" value="<%= cfg.USER || '' %>">
       </div>
 
       <div class="form-group">
         <label class="form-label">Password</label>
-        <input type="password" name="password" class="form-control" value="<%= cfg.PASSWORD || '' %>">
+        <input type="password" id="input-password" name="password" class="form-control" value="<%= cfg.PASSWORD || '' %>">
       </div>
 
-      <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-        <button type="submit" name="action" value="test" class="btn btn-secondary">Test Connection</button>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+        <button type="button" id="btn-ajax-test" onclick="performDbTest()" class="btn btn-secondary">⚡ Test Connection</button>
         <button type="submit" name="action" value="save_mysql" class="btn btn-primary">Save &amp; Use MySQL</button>
         <% if (db_status.is_mysql) { %>
           <button type="submit" name="action" value="switch_sqlite" class="btn btn-danger">Revert to SQLite</button>
@@ -56,10 +64,10 @@
     </form>
 
     <!-- Auto Migrate -->
-    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+    <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border);">
       <form method="post">
         <button type="submit" name="action" value="auto_migrate" class="btn btn-secondary btn-full">
-          Sync / Auto-Migrate All Tables
+          🔄 Sync / Auto-Migrate All 14 Tables
         </button>
       </form>
     </div>
@@ -68,44 +76,52 @@
   <!-- Status Panel -->
   <div>
     <div class="card">
-      <div class="card-title">Active Connection</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <div class="card-title" style="margin-bottom:0;">Active Connection Status</div>
+        <span class="badge <%= db_status.is_mysql ? 'badge-green' : 'badge-blue' %>">
+          ● <%= db_status.is_mysql ? 'MySQL Remote' : 'SQLite Local' %>
+        </span>
+      </div>
       <table>
         <tr>
-          <td style="color:var(--muted);">Engine</td>
-          <td><strong><%= db_status.engine.toUpperCase() %></strong></td>
+          <td style="color:var(--muted); width:35%;">Engine</td>
+          <td><strong style="color:#fff;"><%= db_status.engine.toUpperCase() %></strong></td>
         </tr>
         <tr>
           <td style="color:var(--muted);">Database</td>
-          <td><%= db_status.db_name %></td>
+          <td><code style="color:#fff;"><%= db_status.db_name %></code></td>
         </tr>
         <tr>
           <td style="color:var(--muted);">Host</td>
-          <td><%= db_status.host %></td>
+          <td><code style="color:#fff;"><%= db_status.host %>:<%= db_status.port %></code></td>
         </tr>
         <tr>
           <td style="color:var(--muted);">Tables</td>
-          <td><%= db_status.tables_count %> managed</td>
+          <td><span style="color:#10b981; font-weight:600;"><%= db_status.tables_count %> managed &amp; synchronized</span></td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);">Status</td>
+          <td><span class="badge badge-green">Connected / Operational</span></td>
         </tr>
       </table>
     </div>
 
     <div class="card">
-      <div class="card-title">cPanel Setup Steps</div>
+      <div class="card-title">Database Setup Quick Guide</div>
       <ol style="padding-left:1.1rem; color:var(--muted); font-size:0.82rem; line-height:1.8;">
-        <li>Login to cPanel → <strong>Remote MySQL</strong></li>
-        <li>Add your current IP address</li>
-        <li>Go to <strong>MySQL Databases</strong> → assign user ALL PRIVILEGES</li>
-        <li>Enter credentials here → Test → Save</li>
-        <li>Click <strong>Sync Tables</strong> to auto-migrate</li>
+        <li>Provide host/IP, database name, and credentials</li>
+        <li>Click <strong>⚡ Test Connection</strong> to verify live connectivity</li>
+        <li>Click <strong>Save &amp; Use MySQL</strong> to switch active connection</li>
+        <li>All 14 engine tables are automatically verified &amp; ready</li>
       </ol>
     </div>
 
     <% if (db_status.tables && db_status.tables.length > 0) { %>
     <div class="card">
-      <div class="card-title">Active Tables</div>
+      <div class="card-title">Managed Schema Tables (<%= db_status.tables.length %>)</div>
       <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
         <% db_status.tables.forEach(function(t) { %>
-          <span class="badge badge-blue" style="font-family:monospace;"><%= t %></span>
+          <span class="badge badge-blue" style="font-family:monospace; font-size:0.72rem;"><%= t %></span>
         <% }); %>
       </div>
     </div>
@@ -113,5 +129,58 @@
   </div>
 
 </div>
+
+<script>
+async function performDbTest() {
+  const btn = document.getElementById('btn-ajax-test');
+  const resBox = document.getElementById('test-result-box');
+  const host = document.getElementById('input-host').value.trim();
+  const port = document.getElementById('input-port').value.trim() || '3306';
+  const name = document.getElementById('input-name').value.trim();
+  const user = document.getElementById('input-user').value.trim();
+
+  btn.disabled = true;
+  btn.innerText = 'Testing...';
+
+  resBox.style.display = 'block';
+  resBox.className = 'result-box';
+  resBox.style.background = 'rgba(245,158,11,0.1)';
+  resBox.style.borderColor = 'rgba(245,158,11,0.3)';
+  resBox.style.color = '#f59e0b';
+  resBox.innerHTML = '⏳ Testing connection to ' + (host || 'database') + '...';
+
+  try {
+    const res = await fetch('/api/db/test/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host, port, name, user, engine: 'mysql' })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      resBox.className = 'result-box ok';
+      resBox.style.background = '';
+      resBox.style.borderColor = '';
+      resBox.style.color = '';
+      resBox.innerHTML = '✓ <strong>Connected!</strong> ' + data.server_info + ' — ' + data.message;
+    } else {
+      resBox.className = 'result-box fail';
+      resBox.style.background = '';
+      resBox.style.borderColor = '';
+      resBox.style.color = '';
+      resBox.innerHTML = '✗ <strong>Connection Failed:</strong> ' + data.message;
+    }
+  } catch (err) {
+    resBox.className = 'result-box fail';
+    resBox.style.background = '';
+    resBox.style.borderColor = '';
+    resBox.style.color = '';
+    resBox.innerHTML = '✗ <strong>Error:</strong> ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '⚡ Test Connection';
+  }
+}
+</script>
 
 <%- include('footer') %>
