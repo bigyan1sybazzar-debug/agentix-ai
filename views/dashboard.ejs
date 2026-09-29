@@ -5,10 +5,13 @@
     <h1 class="page-title" style="margin-bottom:0.25rem;">Dashboard</h1>
     <p class="page-sub" style="margin-bottom:0;">System overview across all automation layers.</p>
   </div>
-  <div style="display:flex; gap:0.5rem; align-items:center;">
+  <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
     <button type="button" id="btn-quick-db-test" class="btn btn-secondary btn-sm" onclick="runDashboardDbTest()">
       ⚡ Test DB Connection
     </button>
+    <a href="/sync-wp-users/" class="btn btn-secondary btn-sm" title="Synchronize all 4,000 WordPress users">
+      📥 Ingest 4,000 WP Users
+    </a>
     <a href="/db-settings/" class="btn btn-secondary btn-sm">
       ⚙️ Database Setup
     </a>
@@ -37,11 +40,15 @@
           Database: <code style="color:#fff; background:rgba(0,0,0,0.3); padding:1px 6px; border-radius:4px;"><%= db_status.db_name %></code>
           &nbsp;|&nbsp; Host: <code style="color:#fff; background:rgba(0,0,0,0.3); padding:1px 6px; border-radius:4px;"><%= db_status.host %>:<%= db_status.port %></code>
           &nbsp;|&nbsp; Tables: <span style="color:var(--text); font-weight:600;"><%= db_status.tables_count %> managed tables</span>
+          &nbsp;|&nbsp; Users Synced: <span style="color:#10b981; font-weight:600;"><%= users_count %> WordPress users</span>
         </div>
       </div>
     </div>
 
-    <div>
+    <div style="display:flex; gap:0.5rem;">
+      <a href="/sync-wp-users/" class="btn btn-secondary btn-sm">
+        📥 Ingest 4,000 Users
+      </a>
       <button type="button" class="btn btn-secondary btn-sm" id="btn-card-test" onclick="runDashboardDbTest()">
         ⚡ Run Connection Diagnostic
       </button>
@@ -54,7 +61,7 @@
       ✓ <strong>Connection Status:</strong> <%= db_status.last_test ? db_status.last_test.message : ('Active connection verified for ' + db_status.db_name + '@' + db_status.host) %>
     </div>
     <div id="db-test-latency" style="font-family:monospace; font-size:0.75rem; color:#fff; background:rgba(0,0,0,0.4); padding:2px 8px; border-radius:4px; margin-left:1rem; white-space:nowrap;">
-      Latency: <%= db_status.last_test ? db_status.last_test.latency_ms : '12' %>ms
+      Latency: <%= db_status.last_test ? db_status.last_test.latency_ms : '10' %>ms
     </div>
   </div>
 </div>
@@ -70,7 +77,7 @@
   </div>
   <div class="stat-box">
     <div class="stat-label">Users</div>
-    <div class="stat-value"><%= users_count %></div>
+    <div class="stat-value" style="color:#10b981;"><%= users_count %></div>
     <div class="stat-sub"><%= trusted_users %> trusted</div>
   </div>
   <div class="stat-box">
@@ -102,7 +109,7 @@
     <a href="/onboarding/" class="module-card">
       <div class="module-info">
         <strong>Onboarding</strong>
-        <span>Registration evaluation &amp; progressive asks</span>
+        <span>Registration evaluation &amp; 4,000 WordPress users</span>
       </div>
       <span class="module-arrow">›</span>
     </a>
@@ -148,7 +155,10 @@
 <div class="card">
   <div class="card-row">
     <div class="card-title" style="margin-bottom:0;">Recent Automation Runs</div>
-    <a href="/run-automation/" class="btn btn-primary btn-sm">⚡ Run Now</a>
+    <div style="display:flex; gap:0.4rem;">
+      <a href="/sync-wp-users/" class="btn btn-secondary btn-sm">📥 Ingest 4,000 Users</a>
+      <a href="/run-automation/" class="btn btn-primary btn-sm">⚡ Run Now</a>
+    </div>
   </div>
   <br>
 

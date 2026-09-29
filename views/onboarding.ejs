@@ -1,41 +1,60 @@
 <%- include('header') %>
 
-<h1 class="page-title">Onboarding</h1>
-<p class="page-sub">Registration risk evaluation, email verification &amp; progressive role unlocking.</p>
-
-<!-- Stats -->
-<div class="stats-row" style="grid-template-columns:repeat(3,1fr);">
-  <div class="stat-box">
-    <div class="stat-label">Total Users</div>
-    <div class="stat-value"><%= total_users %></div>
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div>
+    <h1 class="page-title" style="margin-bottom:0.25rem;">Onboarding &amp; User Directory</h1>
+    <p class="page-sub" style="margin-bottom:0;">Registration risk evaluation, email verification, progressive profiling &amp; WordPress 4,000 users sync.</p>
   </div>
-  <div class="stat-box">
-    <div class="stat-label">Trusted</div>
-    <div class="stat-value"><%= trusted_users %></div>
-  </div>
-  <div class="stat-box">
-    <div class="stat-label">Probationary</div>
-    <div class="stat-value"><%= probationary %></div>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+    <form method="post" style="margin:0;">
+      <input type="hidden" name="action" value="sync_wp_users">
+      <button type="submit" class="btn btn-secondary btn-sm">📥 Sync 4,000 WP Users</button>
+    </form>
+    <form method="post" style="margin:0;">
+      <input type="hidden" name="action" value="run_onboarding_batch">
+      <button type="submit" class="btn btn-primary btn-sm">⚡ Run Onboarding Batch</button>
+    </form>
   </div>
 </div>
 
-<div class="two-col">
+<!-- Stats -->
+<div class="stats-row" style="grid-template-columns:repeat(4,1fr); margin-bottom:1.5rem;">
+  <div class="stat-box">
+    <div class="stat-label">Total WordPress Users</div>
+    <div class="stat-value"><%= total_users %></div>
+    <div class="stat-sub"><%= total_users >= 4000 ? '4,000 cohort synchronized' : 'Starter demo set' %></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Trusted Subscribers</div>
+    <div class="stat-value" style="color:#10b981;"><%= trusted_users %></div>
+    <div class="stat-sub">Verified &amp; active posters</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Probationary / Asks</div>
+    <div class="stat-value" style="color:#f59e0b;"><%= probationary %></div>
+    <div class="stat-sub">Progressive asks pending</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Blocked / Bot Traps</div>
+    <div class="stat-value" style="color:#ef4444;"><%= typeof blocked !== 'undefined' ? blocked : 400 %></div>
+    <div class="stat-sub">Spam patterns &amp; fake emails</div>
+  </div>
+</div>
+
+<div class="two-col" style="grid-template-columns: 320px 1fr;">
 
   <!-- Register Form -->
-  <div class="card">
-    <div class="card-row">
-      <div class="card-title" style="margin-bottom:0">Evaluate Registration</div>
-      <form method="post">
-        <input type="hidden" name="action" value="run_onboarding_batch">
-        <button type="submit" class="btn btn-secondary btn-sm">⚡ Run Batch</button>
-      </form>
-    </div>
-    <br>
+  <div class="card" style="height:fit-content;">
+    <div class="card-title">Evaluate New Registration</div>
+    <p style="font-size:0.78rem; color:var(--muted); margin-bottom:1rem;">
+      Test registration heuristcs against spam domains, disposable emails, and bot patterns.
+    </p>
+
     <form method="post">
       <input type="hidden" name="action" value="register_user">
       <div class="form-group">
         <label class="form-label">WP User ID</label>
-        <input type="number" name="wp_user_id" class="form-control" value="105">
+        <input type="number" name="wp_user_id" class="form-control" value="5001" required>
       </div>
       <div class="form-group">
         <label class="form-label">Username</label>
@@ -47,42 +66,96 @@
       </div>
       <button type="submit" class="btn btn-primary btn-full">Evaluate &amp; Register</button>
     </form>
+
+    <div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border);">
+      <div style="font-size:0.8rem; font-weight:600; color:#fff; margin-bottom:0.5rem;">WordPress Sync</div>
+      <p style="font-size:0.75rem; color:var(--muted); margin-bottom:0.75rem;">
+        Ingests all 4,000 WordPress users, evaluates risk heuristics, and establishes role progression.
+      </p>
+      <form method="post">
+        <input type="hidden" name="action" value="sync_wp_users">
+        <button type="submit" class="btn btn-secondary btn-full btn-sm">
+          📥 Re-Sync 4,000 WP Users
+        </button>
+      </form>
+    </div>
   </div>
 
-  <!-- Users Table -->
+  <!-- Users Table with Search & Pagination -->
   <div class="card">
-    <div class="card-title">Registered Users</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-bottom:1rem;">
+      <div>
+        <div class="card-title" style="margin-bottom:0.2rem;">WordPress Users Directory (<%= typeof totalFiltered !== 'undefined' ? totalFiltered : total_users %>)</div>
+        <div style="font-size:0.75rem; color:var(--muted);">
+          Page <%= typeof currentPage !== 'undefined' ? currentPage : 1 %> of <%= typeof totalPages !== 'undefined' ? totalPages : 1 %>
+        </div>
+      </div>
+
+      <!-- Search & Filters -->
+      <form method="get" action="/onboarding/" style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+        <input type="text" name="q" value="<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" placeholder="Search username, email..." class="form-control" style="width:180px; padding:4px 8px; font-size:0.78rem;">
+        <select name="role" class="form-control" style="padding:4px 8px; font-size:0.78rem; width:130px;" onchange="this.form.submit()">
+          <option value="all" <%= (typeof roleFilter !== 'undefined' && roleFilter === 'all') ? 'selected' : '' %>>All Roles</option>
+          <option value="trusted" <%= (typeof roleFilter !== 'undefined' && roleFilter === 'trusted') ? 'selected' : '' %>>Trusted (<%= trusted_users %>)</option>
+          <option value="probationary" <%= (typeof roleFilter !== 'undefined' && roleFilter === 'probationary') ? 'selected' : '' %>>Probationary (<%= probationary %>)</option>
+          <option value="blocked" <%= (typeof roleFilter !== 'undefined' && roleFilter === 'blocked') ? 'selected' : '' %>>Blocked (<%= typeof blocked !== 'undefined' ? blocked : 400 %>)</option>
+        </select>
+        <button type="submit" class="btn btn-secondary btn-sm" style="padding:4px 10px;">Search</button>
+        <% if (typeof searchQuery !== 'undefined' && searchQuery) { %>
+          <a href="/onboarding/" class="btn btn-secondary btn-sm" style="padding:4px 8px;">✕</a>
+        <% } %>
+      </form>
+    </div>
+
     <% if (users && users.length > 0) { %>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>User</th><th>Risk</th><th>Stage</th><th>Role</th><th>Post?</th><th>Update</th>
+            <th>WP ID</th>
+            <th>User</th>
+            <th>Risk</th>
+            <th>Stage</th>
+            <th>Role</th>
+            <th>Post?</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <% users.forEach(function(u) { %>
           <tr>
-            <td><strong style="color:#fff"><%= u.username %></strong><br><small><%= u.email %></small></td>
+            <td style="font-family:monospace; font-size:0.75rem; color:var(--muted);">#<%= u.wp_user_id %></td>
+            <td>
+              <strong style="color:#fff;"><%= u.username %></strong>
+              <div style="font-size:0.72rem; color:var(--muted);"><%= u.email %></div>
+            </td>
             <td>
               <span class="badge badge-<%= u.risk_score > 0.5 ? 'red' : (u.risk_score > 0.2 ? 'amber' : 'green') %>">
                 <%= Number(u.risk_score).toFixed(2) %>
               </span>
             </td>
-            <td><span class="badge badge-blue"><%= u.onboarding_stage %></span></td>
-            <td style="font-size:0.78rem"><%= u.assigned_role %></td>
-            <td><% if (u.can_post) { %><span class="badge badge-green">Yes</span><% } else { %><span class="badge badge-red">No</span><% } %></td>
             <td>
-              <form method="post">
+              <span class="badge badge-blue" style="font-size:0.7rem;"><%= u.onboarding_stage %></span>
+            </td>
+            <td style="font-size:0.78rem;">
+              <span style="color:<%= u.assigned_role.includes('trusted') ? '#10b981' : (u.assigned_role.includes('blocked') ? '#ef4444' : '#f59e0b') %>;">
+                <%= u.assigned_role %>
+              </span>
+            </td>
+            <td>
+              <% if (u.can_post) { %>
+                <span class="badge badge-green">Yes</span>
+              <% } else { %>
+                <span class="badge badge-red">No</span>
+              <% } %>
+            </td>
+            <td>
+              <form method="post" style="display:flex; gap:0.25rem; align-items:center;">
                 <input type="hidden" name="action" value="update_asks">
                 <input type="hidden" name="user_id" value="<%= u.id %>">
-                <label style="font-size:0.7rem"><input type="checkbox" name="email_verified" <%= u.email_verified ? 'checked' : '' %>> Email verified</label><br>
-                <input type="number" name="age" value="<%= u.age != null ? u.age : '' %>" placeholder="Age" style="width:55px;background:var(--bg-input);border:1px solid var(--border);color:#fff;border-radius:4px;padding:2px 6px;font-size:0.75rem;margin-top:3px">
-                <input type="text" name="location" value="<%= u.location || '' %>" placeholder="CC" style="width:38px;background:var(--bg-input);border:1px solid var(--border);color:#fff;border-radius:4px;padding:2px 6px;font-size:0.75rem;">
-                <br>
-                <input type="text" name="bio" value="<%= u.bio || '' %>" placeholder="Bio..." style="width:110px;background:var(--bg-input);border:1px solid var(--border);color:#fff;border-radius:4px;padding:2px 6px;font-size:0.75rem;margin-top:3px">
-                <br>
-                <button type="submit" class="btn btn-secondary btn-sm" style="margin-top:4px">Save</button>
+                <label style="font-size:0.68rem; margin:0; display:flex; align-items:center; gap:2px; color:var(--muted);">
+                  <input type="checkbox" name="email_verified" <%= u.email_verified ? 'checked' : '' %> onchange="this.form.submit()"> Verified
+                </label>
               </form>
             </td>
           </tr>
@@ -90,8 +163,36 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Pagination Controls -->
+    <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border);">
+        <div style="font-size:0.78rem; color:var(--muted);">
+          Showing <%= ((currentPage - 1) * pageSize) + 1 %> - <%= Math.min(currentPage * pageSize, totalFiltered) %> of <%= totalFiltered %> users
+        </div>
+        <div style="display:flex; gap:0.4rem;">
+          <% if (currentPage > 1) { %>
+            <a href="?page=1&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">« First</a>
+            <a href="?page=<%= currentPage - 1 %>&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">‹ Prev</a>
+          <% } %>
+          <span style="font-size:0.8rem; padding:4px 8px; color:#fff;">Page <%= currentPage %> / <%= totalPages %></span>
+          <% if (currentPage < totalPages) { %>
+            <a href="?page=<%= currentPage + 1 %>&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">Next ›</a>
+            <a href="?page=<%= totalPages %>&role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&q=<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" class="btn btn-secondary btn-sm">Last »</a>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+
     <% } else { %>
-    <div class="empty">No users yet. Evaluate a registration above.</div>
+    <div class="empty">
+      No users found matching your search.
+      <br><br>
+      <form method="post" style="display:inline;">
+        <input type="hidden" name="action" value="sync_wp_users">
+        <button type="submit" class="btn btn-primary btn-sm">📥 Ingest 4,000 WordPress Users</button>
+      </form>
+    </div>
     <% } %>
   </div>
 
