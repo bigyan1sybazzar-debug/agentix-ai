@@ -87,38 +87,57 @@ function saveSmtpConfig(cfg) {
 }
 
 // Helper to create nodemailer transporter
-function getSmtpTransporter(customPass) {
-  const pass = customPass !== undefined ? customPass : smtpConfig.pass;
-  return nodemailer.createTransport({
-    host: smtpConfig.host || 'mail.appflicks.com',
-    port: parseInt(smtpConfig.port || '465', 10),
-    secure: smtpConfig.secure !== false, // true for port 465
+function getSmtpTransporter(options = {}) {
+  const host = (options.host || smtpConfig.host || 'mail.appflicks.com').trim();
+  const port = parseInt(options.port || smtpConfig.port || 465, 10);
+  const user = (options.user || smtpConfig.user || 'test@appflicks.com').trim();
+  const pass = options.pass !== undefined ? options.pass : (smtpConfig.pass || '');
+  const isSecure = port === 465;
+  const authMethod = options.authMethod || undefined;
+
+  const config = {
+    host,
+    port,
+    secure: isSecure,
     auth: {
-      user: smtpConfig.user || 'test@appflicks.com',
+      user,
       pass: pass || ''
     },
     tls: {
       rejectUnauthorized: false
     }
-  });
+  };
+
+  if (!isSecure && (port === 587 || port === 25 || port === 2525)) {
+    config.requireTLS = true;
+  }
+
+  if (authMethod) {
+    config.authMethod = authMethod;
+  }
+
+  return nodemailer.createTransport(config);
 }
 
-// Send email helper
-async function sendSmtpEmail({ to, subject, html, text, customPass }) {
-  const recipient = to || smtpConfig.recipient || 'test@appflicks.com';
+// Send email helper with automatic fallback for cPanel / Bluehost Exim
+async function sendSmtpEmail({ to, subject, html, text, customPass, customHost, customPort, customUser, customAuthMethod }) {
+  const recipient = (to || smtpConfig.recipient || 'test@appflicks.com').trim();
   const pass = customPass !== undefined ? customPass : smtpConfig.pass;
+  const host = (customHost || smtpConfig.host || 'mail.appflicks.com').trim();
+  const port = parseInt(customPort || smtpConfig.port || 465, 10);
+  const user = (customUser || smtpConfig.user || 'test@appflicks.com').trim();
 
   if (!pass) {
     return {
       sent: false,
-      message: 'SMTP credentials configured (mail.appflicks.com:465 for test@appflicks.com). Please enter your email password in SMTP Settings to dispatch live emails.'
+      message: `SMTP password required for ${user}. Please enter your email password in SMTP Settings to dispatch live emails.`
     };
   }
 
   try {
-    const transporter = getSmtpTransporter(pass);
+    const transporter = getSmtpTransporter({ pass, host, port, user, authMethod: customAuthMethod });
     const info = await transporter.sendMail({
-      from: smtpConfig.from || `"AppFlicks Automation Engine" <${smtpConfig.user || 'test@appflicks.com'}>`,
+      from: smtpConfig.from || `"AppFlicks Automation Engine" <${user}>`,
       to: recipient,
       subject: subject || '⚡ AppFlicks Automation Alert',
       text: text || '',
@@ -129,14 +148,42 @@ async function sendSmtpEmail({ to, subject, html, text, customPass }) {
     return {
       sent: true,
       messageId: info.messageId,
-      message: `Email successfully sent to ${recipient} via mail.appflicks.com:465 (Message ID: ${info.messageId})`
+      message: `Email successfully sent to ${recipient} via ${host}:${port} (Message ID: ${info.messageId})`
     };
   } catch (err) {
     console.error('[SMTP ERROR]:', err.message);
+
+    // If authentication failed with default authMethod, retry with AUTH LOGIN
+    if ((err.code === 'EAUTH' || err.message.includes('535')) && !customAuthMethod) {
+      try {
+        console.log('[SMTP] Retrying dispatch with authMethod: LOGIN...');
+        const loginTransporter = getSmtpTransporter({ pass, host, port, user, authMethod: 'LOGIN' });
+        const info = await loginTransporter.sendMail({
+          from: smtpConfig.from || `"AppFlicks Automation Engine" <${user}>`,
+          to: recipient,
+          subject: subject || '⚡ AppFlicks Automation Alert',
+          text: text || '',
+          html: html || `<p>${text || subject}</p>`
+        });
+        return {
+          sent: true,
+          messageId: info.messageId,
+          message: `Email successfully sent to ${recipient} via ${host}:${port} using AUTH LOGIN!`
+        };
+      } catch (loginErr) {
+        console.error('[SMTP LOGIN RETRY ERROR]:', loginErr.message);
+      }
+    }
+
+    let detailedHelp = err.message;
+    if (err.message.includes('535') || err.code === 'EAUTH') {
+      detailedHelp = `Authentication rejected (535 Incorrect authentication data). If your password is correct, note that Bluehost/cPanel cPHulk Brute Force Protection may have temporarily locked this account after recent attempts (wait 15 mins or flush cPHulk in cPanel). Also try using server hostname 'box5144.bluehost.com' or Port 587 (TLS).`;
+    }
+
     return {
       sent: false,
       error: err.message,
-      message: `Failed to dispatch email: ${err.message}`
+      message: `Failed to dispatch email: ${detailedHelp}`
     };
   }
 }
@@ -483,24 +530,17 @@ async function attemptRealMysqlSync(cfg) {
     const [tableRows] = await conn.query('SHOW TABLES');
     const tableNames = tableRows.map(r => Object.values(r)[0]);
 
-    // Locate user table: 8uI_users, wp_users, etc.
-    let userTable = tableNames.find(t => t.toLowerCase() === '8ui_users');
-    if (!userTable) userTable = tableNames.find(t => t.toLowerCase() === 'wp_users');
-    if (!userTable) {
-      userTable = tableNames.find(t =>
-        t.toLowerCase().endsWith('_users') &&
-        !t.toLowerCase().includes('follow') &&
-        !t.toLowerCase().includes('reaction') &&
-        !t.toLowerCase().includes('rated') &&
-        !t.toLowerCase().includes('voted') &&
-        !t.toLowerCase().includes('front')
-      );
-    }
-    if (!userTable) userTable = tableNames.find(t => t.toLowerCase() === 'users' || t.toLowerCase() === 'auth_user');
+    // Locate user and usermeta tables: 8uI_users, wp_users, 8uI_usermeta, wp_usermeta, etc.
+    const { userTable, metaTable } = findWordPressTables(tableNames);
 
     let rowCount = 0;
     if (userTable) {
-      const [uRows] = await conn.query(`SELECT ID, user_login, user_email, user_registered, display_name FROM \`${userTable}\` ORDER BY ID ASC LIMIT 10000`);
+      const [uRows] = await conn.query(`
+        SELECT ID, user_login, user_email, user_registered, display_name,
+               user_status, user_activation_key, user_pass
+        FROM \`${userTable}\`
+        ORDER BY ID ASC LIMIT 10000
+      `);
       rowCount = uRows.length;
 
       if (uRows.length > 0) {
@@ -509,6 +549,16 @@ async function attemptRealMysqlSync(cfg) {
           const uname = r.user_login || r.username || r.user_nicename || r.display_name || `user_${wpid}`;
           const uemail = r.user_email || r.email || `${uname}@example.com`;
           const evalRes = evaluateRegistration(uname, uemail);
+
+          // Check if database marks this user as blocked/locked
+          const isDbBlocked = (r.user_status && Number(r.user_status) !== 0) ||
+            (r.user_activation_key && r.user_activation_key.includes('BLOCKED')) ||
+            (r.user_pass && r.user_pass.startsWith('$BLOCKED_'));
+
+          const assigned_role = isDbBlocked ? 'restricted_blocked' : evalRes.assigned_role;
+          const evaluation_status = isDbBlocked ? 'rejected' : evalRes.evaluation_status;
+          const onboarding_stage = isDbBlocked ? 'escalated' : evalRes.onboarding_stage;
+          const risk_score = isDbBlocked ? 0.95 : evalRes.risk_score;
 
           return {
             id: wpid,
@@ -520,12 +570,12 @@ async function attemptRealMysqlSync(cfg) {
             location: 'US',
             bio: r.display_name && r.display_name !== uname ? r.display_name : '',
             avatar_completed: true,
-            assigned_role: evalRes.assigned_role,
-            onboarding_stage: evalRes.onboarding_stage,
-            evaluation_status: evalRes.evaluation_status,
-            risk_score: evalRes.risk_score,
-            can_post: evalRes.assigned_role.includes('trusted'),
-            can_comment: !evalRes.assigned_role.includes('blocked'),
+            assigned_role,
+            onboarding_stage,
+            evaluation_status,
+            risk_score,
+            can_post: assigned_role.includes('trusted'),
+            can_comment: !assigned_role.includes('blocked'),
             can_vote: true,
             created_at: r.user_registered ? new Date(r.user_registered).toISOString().replace('T', ' ').substring(0, 16) : new Date().toISOString().substring(0, 16)
           };
@@ -556,6 +606,7 @@ async function attemptRealMysqlSync(cfg) {
       latency_ms: latency,
       server_info: `MySQL live at ${host}:${port}`,
       user_table: userTable,
+      meta_table: metaTable,
       count: rowCount,
       tables: tableNames
     };
@@ -596,15 +647,208 @@ async function attemptRealMysqlSync(cfg) {
   }
 }
 
+// Helper to locate WordPress user and usermeta tables
+function findWordPressTables(tableNames) {
+  let userTable = tableNames.find(t => t.toLowerCase() === '8ui_users');
+  if (!userTable) userTable = tableNames.find(t => t.toLowerCase() === 'wp_users');
+  if (!userTable) {
+    userTable = tableNames.find(t =>
+      t.toLowerCase().endsWith('_users') &&
+      !t.toLowerCase().includes('follow') &&
+      !t.toLowerCase().includes('reaction') &&
+      !t.toLowerCase().includes('rated') &&
+      !t.toLowerCase().includes('voted') &&
+      !t.toLowerCase().includes('front')
+    );
+  }
+  if (!userTable) userTable = tableNames.find(t => t.toLowerCase() === 'users' || t.toLowerCase() === 'auth_user');
+
+  let metaTable = null;
+  if (userTable) {
+    const prefix = userTable.replace(/users$/i, '');
+    metaTable = tableNames.find(t => t.toLowerCase() === `${prefix.toLowerCase()}usermeta`);
+  }
+  if (!metaTable) metaTable = tableNames.find(t => t.toLowerCase() === '8ui_usermeta' || t.toLowerCase() === 'wp_usermeta');
+  if (!metaTable) metaTable = tableNames.find(t => t.toLowerCase().endsWith('_usermeta') || t.toLowerCase() === 'usermeta');
+
+  return { userTable, metaTable };
+}
+
+// Core helper: Sync a single user record directly into real WordPress tables
+async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
+  if (!conn || !user || !userTable) return { success: false, reason: 'No connection, user, or userTable' };
+
+  const uid = user.wp_user_id || user.id;
+  const uname = user.username;
+  const uemail = user.email;
+  const isBlocked = user.assigned_role.includes('blocked') || user.evaluation_status === 'rejected' || (user.risk_score >= 0.7);
+  const isTrusted = user.assigned_role.includes('trusted');
+  const isProbationary = user.assigned_role.includes('probationary');
+
+  // Check if user exists in the real WordPress userTable
+  const [existing] = await conn.query(
+    `SELECT ID, user_login, user_pass, user_status, user_activation_key FROM \`${userTable}\` WHERE ID = ? OR user_login = ? OR user_email = ? LIMIT 1`,
+    [uid, uname, uemail]
+  );
+
+  let updatedWp = false;
+  let loginAction = 'unchanged';
+
+  if (existing.length > 0) {
+    const row = existing[0];
+    const actualId = row.ID;
+
+    if (isBlocked) {
+      // 1. Mark user_status = 1 (WordPress spam / disabled marker)
+      // 2. Mark user_activation_key = 'BLOCKED_BY_AGENTIX_AI'
+      // 3. Disable password login so they cannot log in!
+      const currentPass = row.user_pass || '';
+      let blockedPass = currentPass;
+
+      if (!currentPass.startsWith('$BLOCKED_')) {
+        // Save original password in usermeta so it can be restored if unblocked
+        if (metaTable) {
+          try {
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_saved_pass', ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)`,
+              [actualId, currentPass]
+            );
+          } catch (e) {}
+        }
+        blockedPass = '$BLOCKED_' + Buffer.from(Date.now() + '_' + actualId).toString('base64').substring(0, 18);
+        await conn.query(
+          `UPDATE \`${userTable}\` SET user_status = 1, user_activation_key = 'BLOCKED_BY_AGENTIX_AI', user_pass = ? WHERE ID = ?`,
+          [blockedPass, actualId]
+        );
+      } else {
+        await conn.query(
+          `UPDATE \`${userTable}\` SET user_status = 1, user_activation_key = 'BLOCKED_BY_AGENTIX_AI' WHERE ID = ?`,
+          [actualId]
+        );
+      }
+
+      // Update WordPress capabilities in usermeta to empty / blocked
+      if (metaTable) {
+        const prefix = userTable.replace(/users$/i, '');
+        const capKey = `${prefix}capabilities`;
+        try {
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:0:{}') ON DUPLICATE KEY UPDATE meta_value = 'a:0:{}'`,
+            [actualId, capKey]
+          );
+        } catch (e) {}
+      }
+
+      loginAction = 'DISABLED (user_status=1, pass locked)';
+      updatedWp = true;
+    } else if (isTrusted || isProbationary) {
+      // User is TRUSTED or PROBATIONARY:
+      // 1. Set user_status = 0 (Active)
+      // 2. Clear activation key
+      // 3. If password was locked, restore original pass if saved
+      let restorePassSql = '';
+      let params = [0, '', actualId];
+
+      if (row.user_pass && row.user_pass.startsWith('$BLOCKED_')) {
+        let restoredPass = null;
+        if (metaTable) {
+          try {
+            const [saved] = await conn.query(
+              `SELECT meta_value FROM \`${metaTable}\` WHERE user_id = ? AND meta_key = '_agentix_saved_pass' LIMIT 1`,
+              [actualId]
+            );
+            if (saved.length > 0 && saved[0].meta_value) {
+              restoredPass = saved[0].meta_value;
+            }
+          } catch (e) {}
+        }
+        if (restoredPass) {
+          restorePassSql = ', user_pass = ?';
+          params = [0, '', restoredPass, actualId];
+        }
+      }
+
+      await conn.query(
+        `UPDATE \`${userTable}\` SET user_status = ?, user_activation_key = ? ${restorePassSql} WHERE ID = ?`,
+        params
+      );
+
+      // Update usermeta capabilities
+      if (metaTable) {
+        const prefix = userTable.replace(/users$/i, '');
+        const capKey = `${prefix}capabilities`;
+        const levelKey = `${prefix}user_level`;
+        const roleCap = isTrusted ? 'a:1:{s:10:"subscriber";b:1;}' : 'a:1:{s:23:"subscriber_probationary";b:1;}';
+
+        try {
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)`,
+            [actualId, capKey, roleCap]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
+            [actualId, levelKey]
+          );
+        } catch (e) {}
+      }
+
+      loginAction = 'ENABLED (user_status=0, active)';
+      updatedWp = true;
+    }
+  } else {
+    // Brand new user from registration: INSERT into real WordPress tables!
+    const passHash = isBlocked
+      ? '$BLOCKED_' + Buffer.from(Date.now() + '_' + uid).toString('base64').substring(0, 18)
+      : '$P$B' + Buffer.from(uname + 'learnami').toString('base64').substring(0, 20);
+
+    await conn.query(
+      `INSERT INTO \`${userTable}\` (ID, user_login, user_pass, user_nicename, user_email, user_url, user_registered, user_activation_key, user_status, display_name)
+       VALUES (?, ?, ?, ?, ?, '', NOW(), ?, ?, ?)`,
+      [
+        uid,
+        uname,
+        passHash,
+        uname,
+        uemail,
+        isBlocked ? 'BLOCKED_BY_AGENTIX_AI' : '',
+        isBlocked ? 1 : 0,
+        uname
+      ]
+    );
+
+    if (metaTable) {
+      const prefix = userTable.replace(/users$/i, '');
+      const capKey = `${prefix}capabilities`;
+      const levelKey = `${prefix}user_level`;
+      const roleCap = isBlocked ? 'a:0:{}' : (isTrusted ? 'a:1:{s:10:"subscriber";b:1;}' : 'a:1:{s:23:"subscriber_probationary";b:1;}');
+      try {
+        await conn.query(
+          `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, ?)`,
+          [uid, capKey, roleCap]
+        );
+        await conn.query(
+          `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0')`,
+          [uid, levelKey]
+        );
+      } catch (e) {}
+    }
+
+    loginAction = isBlocked ? 'INSERTED_BLOCKED' : 'INSERTED_ACTIVE';
+    updatedWp = true;
+  }
+
+  return { success: true, updatedWp, loginAction };
+}
+
 // Track users that were modified by registration, admin action, or state change
 const changedUserIds = new Set();
 
 // ==========================================
-// Fast Single-User Database Sync (Sub-100ms)
+// Fast Single-User Database Sync directly to live WordPress tables
 // ==========================================
 async function syncSingleUserToDatabase(user) {
   if (!dbConfig.USER || !dbConfig.PASSWORD) {
-    return { success: false, mode: 'local', message: 'No MySQL credentials configured' };
+    return { success: false, mode: 'local', message: 'MySQL password is not configured in Database Setup. Changes kept in local memory cache.' };
   }
   try {
     const conn = await mysql.createConnection({
@@ -613,9 +857,20 @@ async function syncSingleUserToDatabase(user) {
       user: dbConfig.USER,
       password: dbConfig.PASSWORD,
       database: dbConfig.NAME,
-      connectTimeout: 3500
+      connectTimeout: 5000
     });
 
+    const [tableRows] = await conn.query('SHOW TABLES');
+    const tableNames = tableRows.map(r => Object.values(r)[0]);
+    const { userTable, metaTable } = findWordPressTables(tableNames);
+
+    // 1. Sync directly to real WordPress table (8uI_users / 8uI_usermeta)
+    let wpSyncResult = null;
+    if (userTable) {
+      wpSyncResult = await syncUserToWordPressTables(conn, user, userTable, metaTable);
+    }
+
+    // 2. Ensure user_onboarding_states table exists and sync
     await conn.query(`
       CREATE TABLE IF NOT EXISTS user_onboarding_states (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -651,16 +906,22 @@ async function syncSingleUserToDatabase(user) {
     await conn.end();
     changedUserIds.delete(user.id);
     changedUserIds.delete(user.wp_user_id);
-    return { success: true, message: `Synced user #${user.wp_user_id} to MySQL!` };
+
+    const loginMsg = wpSyncResult ? ` [WordPress '${userTable}': Login ${wpSyncResult.loginAction}]` : '';
+    return {
+      success: true,
+      mode: 'mysql',
+      message: `✓ Synced user #${user.wp_user_id} (${user.username}) directly to live MySQL${loginMsg} and 'user_onboarding_states'.`
+    };
   } catch (err) {
     console.warn('[SINGLE USER DB SYNC]:', err.message);
-    return { success: false, error: err.message };
+    return { success: false, mode: 'local', error: err.message, message: `Could not reach MySQL: ${err.message}` };
   }
 }
 
 // ==========================================
 // Fast Incremental Database Automation Execution & SMTP Dispatch
-// (Only updates changed/dirty users to avoid network freezing!)
+// (Updates real WordPress 8uI_users + 8uI_usermeta + user_onboarding_states!)
 // ==========================================
 async function executeDatabaseAutomationAndNotify(allUsers, forceFull = false) {
   let dbResult = { success: false, mode: 'local', count: 0, message: '' };
@@ -672,106 +933,139 @@ async function executeDatabaseAutomationAndNotify(allUsers, forceFull = false) {
   // Filter to only changed users unless forceFull is requested
   let usersToSync = [];
   if (forceFull) {
-    usersToSync = allUsers.slice(0, 200); // cap to 200 for remote network safety
+    usersToSync = allUsers.slice(0, 200);
   } else if (changedUserIds.size > 0) {
     usersToSync = allUsers.filter(u => changedUserIds.has(u.id) || changedUserIds.has(u.wp_user_id));
   } else {
-    // If no specific user was changed, sync the 10 most recent user records
-    usersToSync = allUsers.slice(0, 10);
+    // Sync all blocked users to ensure real WordPress lockouts are active, plus recent users
+    const blockedUsers = allUsers.filter(u => u.assigned_role.includes('blocked')).slice(0, 50);
+    const recentUsers = allUsers.slice(0, 20);
+    const combinedMap = new Map();
+    blockedUsers.forEach(u => combinedMap.set(u.wp_user_id || u.id, u));
+    recentUsers.forEach(u => combinedMap.set(u.wp_user_id || u.id, u));
+    usersToSync = Array.from(combinedMap.values());
   }
 
-  // 1. If MySQL is configured, execute fast delta updates on the database!
-  try {
-    const conn = await mysql.createConnection({
-      host: dbConfig.HOST,
-      port: parseInt(dbConfig.PORT || '3306', 10),
-      user: dbConfig.USER,
-      password: dbConfig.PASSWORD,
-      database: dbConfig.NAME,
-      connectTimeout: 4000
-    });
-
-    // Ensure tables exist
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS user_onboarding_states (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        wp_user_id BIGINT NOT NULL UNIQUE,
-        onboarding_stage VARCHAR(50) DEFAULT 'progressive_asks',
-        assigned_role VARCHAR(50) DEFAULT 'subscriber_probationary',
-        risk_score DECIMAL(4,2) DEFAULT 0.00,
-        evaluation_status VARCHAR(50) DEFAULT 'pending',
-        email_verified TINYINT(1) DEFAULT 0,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `);
-
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS automation_task_logs (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        pipeline_name VARCHAR(150),
-        status VARCHAR(50),
-        items_processed INT,
-        duration_seconds DECIMAL(5,2),
-        summary TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `);
-
-    if (usersToSync.length > 0) {
-      const values = usersToSync.map(u => [
-        u.wp_user_id,
-        u.onboarding_stage,
-        u.assigned_role,
-        u.risk_score,
-        u.evaluation_status,
-        u.email_verified ? 1 : 0
-      ]);
-
-      await conn.query(`
-        INSERT INTO user_onboarding_states (wp_user_id, onboarding_stage, assigned_role, risk_score, evaluation_status, email_verified)
-        VALUES ?
-        ON DUPLICATE KEY UPDATE
-          onboarding_stage = VALUES(onboarding_stage),
-          assigned_role = VALUES(assigned_role),
-          risk_score = VALUES(risk_score),
-          evaluation_status = VALUES(evaluation_status),
-          email_verified = VALUES(email_verified),
-          updated_at = NOW()
-      `, [values]);
-    }
-
-    // Insert task log record
-    const summaryText = `Fast delta sync: updated ${usersToSync.length} changed users in ${dbConfig.NAME}. Cohort: ${trustedCount} trusted, ${probCount} probationary, ${blockedCount} blocked.`;
-    await conn.query(`
-      INSERT INTO automation_task_logs (pipeline_name, status, items_processed, duration_seconds, summary, created_at)
-      VALUES (?, ?, ?, ?, ?, NOW())
-    `, [
-      'WordPress Onboarding Fast Delta Sync',
-      'completed',
-      usersToSync.length,
-      0.15,
-      summaryText
-    ]);
-
-    await conn.end();
-
-    dbResult = {
-      success: true,
-      mode: 'mysql',
-      count: usersToSync.length,
-      message: `Updated ${usersToSync.length} changed user record(s) in MySQL 'user_onboarding_states' and logged to 'automation_task_logs'.`
-    };
-
-    lastConnectionStatus.connected = true;
-    changedUserIds.clear();
-  } catch (dbErr) {
-    console.warn('[DB AUTO WARNING]:', dbErr.message);
+  if (!dbConfig.USER || !dbConfig.PASSWORD) {
     dbResult = {
       success: false,
       mode: 'local_cache',
       count: usersToSync.length,
-      message: `Updated ${usersToSync.length} changed record(s) in memory store. (Remote MySQL notice: ${dbErr.message})`
+      message: `⚠️ MySQL password not configured in Database Setup. Updated ${usersToSync.length} user(s) in local memory store. Enter your MySQL password in Database Setup to sync to the live database.`
     };
+  } else {
+    try {
+      const conn = await mysql.createConnection({
+        host: dbConfig.HOST,
+        port: parseInt(dbConfig.PORT || '3306', 10),
+        user: dbConfig.USER,
+        password: dbConfig.PASSWORD,
+        database: dbConfig.NAME,
+        connectTimeout: 6000
+      });
+
+      const [tableRows] = await conn.query('SHOW TABLES');
+      const tableNames = tableRows.map(r => Object.values(r)[0]);
+      const { userTable, metaTable } = findWordPressTables(tableNames);
+
+      // Ensure tables exist
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS user_onboarding_states (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          wp_user_id BIGINT NOT NULL UNIQUE,
+          onboarding_stage VARCHAR(50) DEFAULT 'progressive_asks',
+          assigned_role VARCHAR(50) DEFAULT 'subscriber_probationary',
+          risk_score DECIMAL(4,2) DEFAULT 0.00,
+          evaluation_status VARCHAR(50) DEFAULT 'pending',
+          email_verified TINYINT(1) DEFAULT 0,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS automation_task_logs (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          pipeline_name VARCHAR(150),
+          status VARCHAR(50),
+          items_processed INT,
+          duration_seconds DECIMAL(5,2),
+          summary TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      // 1. Sync all target users directly into real WordPress tables (8uI_users, 8uI_usermeta)
+      let wpUpdatedCount = 0;
+      let blockedLockedCount = 0;
+      if (userTable) {
+        for (const u of usersToSync) {
+          try {
+            const res = await syncUserToWordPressTables(conn, u, userTable, metaTable);
+            if (res.updatedWp) wpUpdatedCount++;
+            if (res.loginAction && res.loginAction.includes('DISABLED')) blockedLockedCount++;
+          } catch (uErr) {
+            console.warn(`[WP TABLE SYNC ERROR u#${u.wp_user_id}]:`, uErr.message);
+          }
+        }
+      }
+
+      // 2. Batch sync to user_onboarding_states
+      if (usersToSync.length > 0) {
+        const values = usersToSync.map(u => [
+          u.wp_user_id,
+          u.onboarding_stage,
+          u.assigned_role,
+          u.risk_score,
+          u.evaluation_status,
+          u.email_verified ? 1 : 0
+        ]);
+
+        await conn.query(`
+          INSERT INTO user_onboarding_states (wp_user_id, onboarding_stage, assigned_role, risk_score, evaluation_status, email_verified)
+          VALUES ?
+          ON DUPLICATE KEY UPDATE
+            onboarding_stage = VALUES(onboarding_stage),
+            assigned_role = VALUES(assigned_role),
+            risk_score = VALUES(risk_score),
+            evaluation_status = VALUES(evaluation_status),
+            email_verified = VALUES(email_verified),
+            updated_at = NOW()
+        `, [values]);
+      }
+
+      // 3. Insert task log record
+      const summaryText = `Fast sync: pushed ${usersToSync.length} user records to live WordPress table '${userTable || 'users'}' (Blocked logins disabled: ${blockedLockedCount}) and 'user_onboarding_states' in ${dbConfig.NAME}.`;
+      await conn.query(`
+        INSERT INTO automation_task_logs (pipeline_name, status, items_processed, duration_seconds, summary, created_at)
+        VALUES (?, ?, ?, ?, ?, NOW())
+      `, [
+        'WordPress Onboarding Fast Delta Sync',
+        'completed',
+        usersToSync.length,
+        0.25,
+        summaryText
+      ]);
+
+      await conn.end();
+
+      dbResult = {
+        success: true,
+        mode: 'mysql',
+        count: usersToSync.length,
+        message: `✓ Successfully synced ${usersToSync.length} user(s) to live database '${dbConfig.NAME}'! Real WordPress table '${userTable || '8uI_users'}' updated (${blockedLockedCount} blocked users locked from logging in).`
+      };
+
+      lastConnectionStatus.connected = true;
+      changedUserIds.clear();
+    } catch (dbErr) {
+      console.warn('[DB AUTO WARNING]:', dbErr.message);
+      dbResult = {
+        success: false,
+        mode: 'local_cache',
+        count: usersToSync.length,
+        message: `⚠️ MySQL connection error to ${dbConfig.HOST}: ${dbErr.message}. Updated ${usersToSync.length} record(s) in local memory store. Please check database credentials in Database Setup.`
+      };
+    }
   }
 
   // 2. Add to in-memory automation logs
@@ -988,13 +1282,15 @@ app.post('/db-settings/', async (req, res) => {
   const action = req.body.action;
 
   if (action === 'test' || action === 'save_mysql') {
+    const submittedPass = req.body.password;
+    const finalPass = (submittedPass !== undefined && submittedPass !== '') ? submittedPass : (dbConfig.PASSWORD || '');
     dbConfig = {
       ENGINE: 'mysql',
-      HOST: (req.body.host || dbConfig.HOST || '').trim(),
+      HOST: (req.body.host || dbConfig.HOST || '162.241.224.185').trim(),
       PORT: (req.body.port || dbConfig.PORT || '3306').trim(),
-      NAME: (req.body.name || dbConfig.NAME || '').trim(),
-      USER: (req.body.user || dbConfig.USER || '').trim(),
-      PASSWORD: req.body.password !== undefined ? req.body.password : (dbConfig.PASSWORD || '')
+      NAME: (req.body.name || dbConfig.NAME || 'learnami_ttest').trim(),
+      USER: (req.body.user || dbConfig.USER || 'learnami_ttest').trim(),
+      PASSWORD: finalPass
     };
     saveDbConfig(dbConfig);
 
@@ -1077,30 +1373,43 @@ app.post('/api/smtp/test/', async (req, res) => {
   const host = (req.body?.host || smtpConfig.host || 'mail.appflicks.com').trim();
   const port = parseInt(req.body?.port || smtpConfig.port || 465, 10);
   const user = (req.body?.user || smtpConfig.user || 'test@appflicks.com').trim();
-  const pass = req.body?.pass !== undefined && req.body.pass !== '' ? req.body.pass : smtpConfig.pass;
+  const pass = (req.body?.pass !== undefined && req.body.pass.trim() !== '') ? req.body.pass.trim() : (smtpConfig.pass || '');
   const recipient = (req.body?.recipient || smtpConfig.recipient || 'test@appflicks.com').trim();
 
-  // Update memory
+  // Update memory & config
   if (pass) smtpConfig.pass = pass;
+  smtpConfig.host = host;
+  smtpConfig.port = port;
+  smtpConfig.user = user;
+  smtpConfig.recipient = recipient;
   saveSmtpConfig(smtpConfig);
 
   const result = await sendSmtpEmail({
     to: recipient,
     subject: '⚡ AppFlicks Automation: Live SMTP Test Confirmation',
-    text: `Your SMTP configuration on mail.appflicks.com:465 is operating properly. Outgoing emails for test@appflicks.com are active.`,
+    text: `Your SMTP configuration on ${host}:${port} is operating properly. Outgoing emails for ${user} are active.`,
     html: `
       <div style="font-family:sans-serif; background:#0f1117; color:#f0f2f5; padding:20px; border-radius:6px;">
         <h3 style="color:#10b981; margin-top:0;">✓ SMTP Live Connection Verified</h3>
-        <p>This is a test notification confirming your SMTP connection to <strong>mail.appflicks.com:465</strong> is operational.</p>
+        <p>This is a test notification confirming your SMTP connection to <strong>${host}:${port}</strong> is operational.</p>
         <p><strong>Authenticated User:</strong> ${user}</p>
         <p><strong>Notification Recipient:</strong> ${recipient}</p>
         <p><strong>Database:</strong> ${dbConfig.NAME} (${dbConfig.HOST})</p>
       </div>
     `,
-    customPass: pass
+    customPass: pass,
+    customHost: host,
+    customPort: port,
+    customUser: user
   });
 
-  res.json(result);
+  res.json({
+    sent: result.sent,
+    message: result.message,
+    host,
+    port,
+    user
+  });
 });
 
 // ==========================================
@@ -1635,7 +1944,7 @@ app.post('/governance/', (req, res) => {
 // ==========================================
 // Policy Registry
 // ==========================================
-app.get('/policies/', (req, res) => {
+app.get(['/policies/', '/policy-registry/'], (req, res) => {
   res.render('policy_registry', {
     title: 'Policy Registry & SFPs | Learnami',
     activeNav: 'policy_registry',
@@ -1645,7 +1954,7 @@ app.get('/policies/', (req, res) => {
   });
 });
 
-app.post('/policies/', (req, res) => {
+app.post(['/policies/', '/policy-registry/'], (req, res) => {
   const policyKey = req.body.policy_key || 'moderation_spam_filter';
   const simName = req.body.simulation_name || 'sandbox_test_run';
   const pol = policies.find(p => p.policy_key === policyKey) || policies[0];
@@ -2005,13 +2314,24 @@ app.all('/run-automation/', async (req, res) => {
 // REST API Endpoints
 // ==========================================
 app.all('/api/db/test/', async (req, res) => {
+  const inputPass = req.body?.password;
+  const finalPass = (inputPass !== undefined && inputPass !== '') ? inputPass : (dbConfig.PASSWORD || '');
   const cfg = {
-    HOST: req.body?.host || req.query?.host || dbConfig.HOST,
-    PORT: req.body?.port || req.query?.port || dbConfig.PORT || '3306',
-    NAME: req.body?.name || req.query?.name || dbConfig.NAME,
-    USER: req.body?.user || req.query?.user || dbConfig.USER,
-    PASSWORD: req.body?.password !== undefined ? req.body.password : dbConfig.PASSWORD
+    HOST: (req.body?.host || req.query?.host || dbConfig.HOST || '162.241.224.185').trim(),
+    PORT: (req.body?.port || req.query?.port || dbConfig.PORT || '3306').trim(),
+    NAME: (req.body?.name || req.query?.name || dbConfig.NAME || 'learnami_ttest').trim(),
+    USER: (req.body?.user || req.query?.user || dbConfig.USER || 'learnami_ttest').trim(),
+    PASSWORD: finalPass
   };
+
+  if (finalPass) {
+    dbConfig.PASSWORD = finalPass;
+    dbConfig.HOST = cfg.HOST;
+    dbConfig.PORT = cfg.PORT;
+    dbConfig.NAME = cfg.NAME;
+    dbConfig.USER = cfg.USER;
+    saveDbConfig(dbConfig);
+  }
 
   const result = await attemptRealMysqlSync(cfg);
   res.json({

@@ -10,33 +10,92 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+  <!-- Mobile Header Bar -->
+  <header class="mobile-top-bar">
+    <button type="button" class="mobile-menu-btn" id="mobile-menu-toggle" aria-label="Toggle navigation menu" onclick="toggleMobileNav()">
+      <span class="hamburger-bar"></span>
+      <span class="hamburger-bar"></span>
+      <span class="hamburger-bar"></span>
+    </button>
+    <div class="mobile-brand">
+      <span class="brand-icon">⚡</span>
+      <span class="brand-title">Learnami</span>
+    </div>
+    <a href="/db-settings/" class="mobile-db-indicator" title="Database Status">
+      <span class="dot <%= !db_status.is_mysql ? 'sqlite' : '' %>"></span>
+      <span><%= db_status.is_mysql ? 'MySQL' : 'Local' %></span>
+    </a>
+  </header>
+
+  <!-- Sidebar Backdrop for Mobile -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleMobileNav(false)"></div>
+
   <div class="app-layout">
     <!-- Sidebar Navigation -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="app-sidebar">
       <div class="sidebar-brand">
-        <h1>⚡ Learnami</h1>
-        <small>Automation Engine</small>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h1>⚡ Learnami</h1>
+            <small>Automation Engine</small>
+          </div>
+          <button type="button" class="sidebar-close-btn" onclick="toggleMobileNav(false)" aria-label="Close menu">✕</button>
+        </div>
       </div>
 
-      <span class="nav-section">Main</span>
-      <a href="/onboarding/" class="nav-item <%= activeNav === 'onboarding' ? 'active' : '' %>">
-        <span class="icon">👥</span> Onboarding &amp; Users
-      </a>
-      <a href="/" class="nav-item <%= activeNav === 'dashboard' ? 'active' : '' %>">
-        <span class="icon">◻</span> Dashboard
-      </a>
-      <a href="/db-settings/" class="nav-item <%= activeNav === 'db_settings' ? 'active' : '' %>">
-        <span class="icon">⬡</span> Database Setup
-      </a>
-      <a href="/smtp-settings/" class="nav-item <%= activeNav === 'smtp_settings' ? 'active' : '' %>">
-        <span class="icon">✉</span> SMTP &amp; Email
-      </a>
+      <div class="sidebar-scrollable">
+        <span class="nav-section">Core Automation</span>
+        <a href="/onboarding/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'onboarding') ? 'active' : '' %>">
+          <span class="icon">👥</span> Onboarding &amp; Users
+        </a>
+        <a href="/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'dashboard') ? 'active' : '' %>">
+          <span class="icon">◻</span> Dashboard
+        </a>
+        <a href="/db-settings/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'db_settings') ? 'active' : '' %>">
+          <span class="icon">⬡</span> Database Setup
+        </a>
+        <a href="/smtp-settings/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'smtp_settings') ? 'active' : '' %>">
+          <span class="icon">✉</span> SMTP &amp; Email
+        </a>
+
+        <span class="nav-section">Governance &amp; Intelligence</span>
+        <a href="/moderation/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'moderation') ? 'active' : '' %>">
+          <span class="icon">🛡️</span> Content Moderation
+        </a>
+        <a href="/governance/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'governance') ? 'active' : '' %>">
+          <span class="icon">⚖️</span> Governance &amp; Audit
+        </a>
+        <a href="/policies/" class="nav-item <%= (typeof activeNav !== 'undefined' && (activeNav === 'policies' || activeNav === 'policy_registry')) ? 'active' : '' %>">
+          <span class="icon">📜</span> Policy Registry
+        </a>
+        <a href="/identity/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'identity') ? 'active' : '' %>">
+          <span class="icon">🔗</span> Identity Resolution
+        </a>
+        <a href="/retrieval/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'retrieval') ? 'active' : '' %>">
+          <span class="icon">🧠</span> Vector Memory RAG
+        </a>
+        <a href="/media/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'media') ? 'active' : '' %>">
+          <span class="icon">🎨</span> Media Assistant
+        </a>
+        <a href="/blueprint/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'blueprint') ? 'active' : '' %>">
+          <span class="icon">📐</span> Blueprint
+        </a>
+        <a href="/runbooks/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'runbooks') ? 'active' : '' %>">
+          <span class="icon">⚡</span> Runbooks
+        </a>
+        <a href="/privacy/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'privacy') ? 'active' : '' %>">
+          <span class="icon">🔒</span> Privacy Boundary
+        </a>
+        <a href="/analytics/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'analytics') ? 'active' : '' %>">
+          <span class="icon">📊</span> Analytics
+        </a>
+      </div>
 
       <div class="sidebar-footer">
         <a href="/db-settings/" class="db-badge">
           <span class="dot <%= !db_status.is_mysql ? 'sqlite' : '' %>"></span>
           <% if (db_status.is_mysql) { %>
-            MySQL: <%= db_status.db_name.substring(0, 14) %>
+            MySQL: <%= (db_status.db_name || '').substring(0, 14) %>
           <% } else { %>
             SQLite / In-Memory (Active)
           <% } %>

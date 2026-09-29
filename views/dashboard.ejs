@@ -70,7 +70,7 @@
 </div>
 
 <!-- Stats Row (Focused strictly on Onboarding & Live Infrastructure) -->
-<div class="stats-row" style="grid-template-columns: repeat(5, 1fr);">
+<div class="stats-row five-col">
   <a href="/db-settings/" class="stat-box clickable" style="border-left: 2px solid <%= db_status.connected ? '#10b981' : '#f59e0b' %>;">
     <div class="stat-label">Database</div>
     <div class="stat-value" style="font-size:1.15rem; color:<%= db_status.connected ? '#10b981' : '#f59e0b' %>;">
@@ -107,7 +107,7 @@
 <!-- Primary Modules Navigation -->
 <div class="card">
   <div class="card-title">Quick Actions &amp; Navigation</div>
-  <div class="module-grid" style="grid-template-columns: repeat(3, 1fr);">
+  <div class="module-grid three-col">
     <a href="/onboarding/" class="module-card">
       <div class="module-info">
         <strong style="color:#fff; font-size:1rem;">👥 Onboarding &amp; User Directory</strong>

@@ -27,6 +27,27 @@
       <% } %>
     </div>
 
+    <!-- Quick Server Configuration Presets -->
+    <div style="margin-bottom:1rem; padding:0.65rem 0.75rem; background:rgba(99,102,241,0.06); border:1px solid rgba(99,102,241,0.25); border-radius:6px;">
+      <div style="font-size:0.75rem; font-weight:600; color:#a5b4fc; margin-bottom:0.4rem;">
+        ⚡ 1-Click Server &amp; Port Presets (Bluehost / cPanel):
+      </div>
+      <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="applySmtpPreset('box5144.bluehost.com', 465)">
+          box5144.bluehost.com:465 (Direct SSL)
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="applySmtpPreset('mail.appflicks.com', 465)">
+          mail.appflicks.com:465 (SSL)
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="applySmtpPreset('box5144.bluehost.com', 587)">
+          box5144.bluehost.com:587 (TLS)
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="applySmtpPreset('mail.appflicks.com', 587)">
+          mail.appflicks.com:587 (TLS)
+        </button>
+      </div>
+    </div>
+
     <form method="post" id="smtp-form" style="margin-top:0.75rem;">
       <input type="hidden" name="action" value="save_smtp">
 
@@ -48,7 +69,12 @@
 
       <div class="form-group">
         <label class="form-label">Email Password</label>
-        <input type="password" id="smtp-pass" name="pass" class="form-control" placeholder="<%= smtp_cfg.pass ? '••••••••••••' : 'Enter email account password' %>" value="<%= smtp_cfg.pass || '' %>">
+        <div style="display:flex; gap:0.4rem;">
+          <input type="password" id="smtp-pass" name="pass" class="form-control" placeholder="<%= smtp_cfg.pass ? '•••••••••••• (Saved)' : 'Enter email account password' %>" value="<%= smtp_cfg.pass || '' %>">
+          <button type="button" id="btn-toggle-pass" onclick="togglePassVisibility()" class="btn btn-secondary btn-sm" title="Show / Hide Password" style="white-space:nowrap;">
+            👁️ Show
+          </button>
+        </div>
         <small style="color:var(--muted); font-size:0.72rem; margin-top:3px; display:block;">
           Enter the password for <code>test@appflicks.com</code> to authenticate outgoing mail.
         </small>
@@ -161,6 +187,30 @@
 </div>
 
 <script>
+function applySmtpPreset(host, port) {
+  document.getElementById('smtp-host').value = host;
+  document.getElementById('smtp-port').value = port;
+  const resBox = document.getElementById('smtp-test-result');
+  resBox.style.display = 'block';
+  resBox.className = 'result-box';
+  resBox.style.background = 'rgba(99,102,241,0.1)';
+  resBox.style.borderColor = 'rgba(99,102,241,0.3)';
+  resBox.style.color = '#a5b4fc';
+  resBox.innerHTML = `✓ Applied preset: <strong>${host}:${port}</strong>. Click '⚡ Send Test Email' or '💾 Save SMTP Settings' below.`;
+}
+
+function togglePassVisibility() {
+  const input = document.getElementById('smtp-pass');
+  const btn = document.getElementById('btn-toggle-pass');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.innerText = '🙈 Hide';
+  } else {
+    input.type = 'password';
+    btn.innerText = '👁️ Show';
+  }
+}
+
 async function testSmtpConnection() {
   const btn = document.getElementById('btn-test-email');
   const resBox = document.getElementById('smtp-test-result');
@@ -171,14 +221,14 @@ async function testSmtpConnection() {
   const recipient = document.getElementById('smtp-recipient').value.trim();
 
   btn.disabled = true;
-  btn.innerText = 'Connecting to mail.appflicks.com:465...';
+  btn.innerText = `Connecting to ${host}:${port}...`;
 
   resBox.style.display = 'block';
   resBox.className = 'result-box';
   resBox.style.background = 'rgba(245,158,11,0.1)';
   resBox.style.borderColor = 'rgba(245,158,11,0.3)';
   resBox.style.color = '#f59e0b';
-  resBox.innerHTML = '⏳ Establishing SSL/TLS connection to mail.appflicks.com:465 and authenticating...';
+  resBox.innerHTML = `⏳ Establishing SSL/TLS connection to ${host}:${port} and authenticating...`;
 
   try {
     const res = await fetch('/api/smtp/test/', {

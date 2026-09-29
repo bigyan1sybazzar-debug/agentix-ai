@@ -30,7 +30,7 @@
     <form method="post" id="db-config-form" style="margin-top:0.75rem;">
       <div class="form-group">
         <label class="form-label">Host / IP</label>
-        <input type="text" id="input-host" name="host" class="form-control" placeholder="27.34.73.244 or server IP" value="<%= cfg.HOST || '27.34.73.244' %>" required>
+        <input type="text" id="input-host" name="host" class="form-control" placeholder="162.241.224.185 or server IP" value="<%= cfg.HOST || '162.241.224.185' %>" required>
       </div>
 
       <div class="form-row">
@@ -46,12 +46,17 @@
 
       <div class="form-group">
         <label class="form-label">MySQL Username</label>
-        <input type="text" id="input-user" name="user" class="form-control" placeholder="cpanel_dbuser" value="<%= cfg.USER || '' %>" required>
+        <input type="text" id="input-user" name="user" class="form-control" placeholder="learnami_ttest" value="<%= cfg.USER || 'learnami_ttest' %>" required>
       </div>
 
       <div class="form-group">
         <label class="form-label">MySQL Password</label>
-        <input type="password" id="input-password" name="password" class="form-control" value="<%= cfg.PASSWORD || '' %>">
+        <div style="display:flex; gap:0.4rem;">
+          <input type="password" id="input-password" name="password" class="form-control" placeholder="<%= cfg.PASSWORD ? '•••••••••••• (Saved)' : 'Enter MySQL password' %>" value="<%= cfg.PASSWORD || '' %>">
+          <button type="button" id="btn-toggle-db-pass" onclick="toggleDbPassVisibility()" class="btn btn-secondary btn-sm" title="Show / Hide Password" style="white-space:nowrap;">
+            👁️ Show
+          </button>
+        </div>
       </div>
 
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
@@ -158,6 +163,18 @@
 </div>
 
 <script>
+function toggleDbPassVisibility() {
+  const input = document.getElementById('input-password');
+  const btn = document.getElementById('btn-toggle-db-pass');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.innerText = '🙈 Hide';
+  } else {
+    input.type = 'password';
+    btn.innerText = '👁️ Show';
+  }
+}
+
 async function performDbTest() {
   const btn = document.getElementById('btn-ajax-test');
   const resBox = document.getElementById('test-result-box');
