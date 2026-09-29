@@ -1,6 +1,8 @@
-# Database files
-db.sqlite3
-
-# Compiled and build artifacts
+# Python bytecode and cache
 __pycache__/
 *.pyc
+
+# Environment files (ignore actual secrets, keep examples)
+.env
+.env.local
+.env.*.local
