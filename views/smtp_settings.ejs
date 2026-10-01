@@ -186,6 +186,73 @@
 
 </div>
 
+<!-- Email Delivery History & Outbox Log -->
+<div class="card" style="margin-top:1.5rem; border-top:3px solid #6366f1;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;">
+    <div>
+      <h3 style="margin:0; font-size:1.05rem; color:#fff;">✉️ Live Email Outbox &amp; Delivery Log (User &amp; Admin)</h3>
+      <p style="margin:2px 0 0 0; font-size:0.75rem; color:var(--muted);">
+        Detailed audit trail of all notifications dispatched to both the user and admin for account blocks, probations, and verifications.
+      </p>
+    </div>
+  </div>
+
+  <% if (typeof outbox !== 'undefined' && outbox && outbox.length > 0) { %>
+    <div style="overflow-x:auto;">
+      <table class="data-table" style="font-size:0.76rem;">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Account</th>
+            <th>Role Event</th>
+            <th>User Recipient</th>
+            <th>Admin Recipient</th>
+            <th>Delivery Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% outbox.slice(0, 15).forEach(function(o) { %>
+          <tr>
+            <td style="font-family:monospace; color:var(--muted);"><%= o.timestamp %></td>
+            <td><strong><%= o.username %></strong> (#<%= o.user_id %>)</td>
+            <td>
+              <span class="badge <%= o.role.includes('blocked') ? 'badge-red' : (o.role.includes('probationary') ? 'badge-amber' : 'badge-green') %>">
+                <%= o.role %>
+              </span>
+            </td>
+            <td>
+              <div><code><%= o.user_email %></code></div>
+              <div style="font-size:0.7rem; color:<%= o.dispatched_to_user ? '#10b981' : '#f59e0b' %>;">
+                <%= o.dispatched_to_user ? '✓ Sent via SMTP' : '✉ Notice recorded in Outbox' %>
+              </div>
+            </td>
+            <td>
+              <div><code><%= o.admin_email %></code></div>
+              <div style="font-size:0.7rem; color:<%= o.dispatched_to_admin ? '#10b981' : '#f59e0b' %>;">
+                <%= o.dispatched_to_admin ? '✓ Sent via SMTP' : '✉ Notice recorded in Outbox' %>
+              </div>
+            </td>
+            <td>
+              <% if (o.dispatched_to_user && o.dispatched_to_admin) { %>
+                <span class="badge badge-green">Sent to Both</span>
+              <% } else if (o.dispatched_to_admin) { %>
+                <span class="badge badge-amber">Admin Copy Sent</span>
+              <% } else { %>
+                <span class="badge badge-blue">Recorded in Outbox</span>
+              <% } %>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <div class="empty" style="padding:1.25rem; font-size:0.8rem;">
+      No email dispatches recorded in this session. Blocking an account, setting probation, or running a batch will record and send live emails to both user and admin.
+    </div>
+  <% } %>
+</div>
+
 <script>
 function applySmtpPreset(host, port) {
   document.getElementById('smtp-host').value = host;

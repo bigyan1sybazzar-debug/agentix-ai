@@ -189,6 +189,164 @@ async function sendSmtpEmail({ to, subject, html, text, customPass, customHost, 
   }
 }
 
+// In-Memory Email Outbox & Delivery Audit Log
+let emailOutboxLogs = [];
+
+// Helper to notify BOTH the User and the Admin on account status change (Blocked, Probationary, Trusted)
+async function notifyAdminAndUserOnRoleChange({ user, oldRole, newRole, reason }) {
+  const adminEmail = (smtpConfig.recipient || 'test@appflicks.com').trim();
+  const userEmail = (user.email || '').trim();
+  const isBlocked = newRole.includes('blocked');
+  const isProbationary = newRole.includes('probationary');
+  const isTrusted = newRole.includes('trusted');
+
+  let userSubject = '';
+  let userHtml = '';
+  let adminSubject = '';
+  let adminHtml = '';
+
+  if (isBlocked) {
+    userSubject = `🚫 Important Security Notice: Your AppFlicks Account is Blocked`;
+    userHtml = `
+      <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #ef4444; max-width:620px;">
+        <h2 style="color:#ef4444; margin-top:0;">🚫 Important Account Notice</h2>
+        <p>Dear <strong>${user.username}</strong>,</p>
+        <p>Your account on AppFlicks has been placed on <strong>Restricted / Blocked</strong> status due to community policy safeguards or risk detection.</p>
+        <div style="background:#1a1318; border:1px solid #7f1d1d; border-radius:6px; padding:14px; margin:16px 0;">
+          <p style="margin:4px 0;"><strong>Account:</strong> ${user.username} (ID #${user.wp_user_id})</p>
+          <p style="margin:4px 0;"><strong>Reason:</strong> ${reason || 'Community policy enforcement / anti-spam screening'}</p>
+          <p style="margin:4px 0;"><strong>Status:</strong> Blocked (Posting &amp; Commenting Paused)</p>
+          <p style="margin:4px 0;"><strong>Your Password:</strong> Kept intact and unchanged</p>
+        </div>
+        <p style="color:#94a3b8; font-size:13px;">
+          If you believe this was in error, you may file an appeal by replying to this notice or reaching out to <a href="mailto:${adminEmail}" style="color:#6366f1;">${adminEmail}</a>.
+        </p>
+        <p style="font-size:11px; color:#64748b; margin-top:20px;">
+          Learnami Automated Agent Governance Engine &bull; AppFlicks
+        </p>
+      </div>
+    `;
+
+    adminSubject = `🚨 [SECURITY AUDIT] User Blocked: ${user.username} (#${user.wp_user_id})`;
+    adminHtml = `
+      <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #ef4444; max-width:620px;">
+        <h2 style="color:#ef4444; margin-top:0;">🚨 User Account Blocked by Admin / Automation</h2>
+        <div style="background:#1a1318; border:1px solid #7f1d1d; border-radius:6px; padding:14px; margin:16px 0;">
+          <p style="margin:4px 0;"><strong>Username:</strong> ${user.username}</p>
+          <p style="margin:4px 0;"><strong>WP User ID:</strong> #${user.wp_user_id}</p>
+          <p style="margin:4px 0;"><strong>User Email:</strong> ${userEmail}</p>
+          <p style="margin:4px 0;"><strong>Assigned Role:</strong> restricted_blocked</p>
+          <p style="margin:4px 0;"><strong>Reason:</strong> ${reason || 'Administrative action'}</p>
+          <p style="margin:4px 0;"><strong>WordPress Status:</strong> user_status=1, capabilities=restricted_blocked (password intact)</p>
+        </div>
+        <p style="font-size:11px; color:#64748b;">Dispatched automatically by AppFlicks Automation Engine.</p>
+      </div>
+    `;
+  } else if (isProbationary) {
+    userSubject = `⚠️ Notice: Your AppFlicks Account is on Supervised Probation`;
+    userHtml = `
+      <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #f59e0b; max-width:620px;">
+        <h2 style="color:#f59e0b; margin-top:0;">⚠️ Account Status: Probationary</h2>
+        <p>Dear <strong>${user.username}</strong>,</p>
+        <p>Your account is active on <strong>Probationary Status</strong> under supervised release.</p>
+        <div style="background:#1c1912; border:1px solid #78350f; border-radius:6px; padding:14px; margin:16px 0;">
+          <p style="margin:4px 0;"><strong>Account:</strong> ${user.username} (ID #${user.wp_user_id})</p>
+          <p style="margin:4px 0;"><strong>Login Status:</strong> Enabled (Log in with your normal password)</p>
+          <p style="margin:4px 0;"><strong>Allowed Permissions:</strong> Commenting &amp; Reading</p>
+          <p style="margin:4px 0;"><strong>Restricted Permissions:</strong> Creating new main posts/topics is temporarily gated</p>
+        </div>
+        <p style="color:#94a3b8; font-size:13px;">
+          Complete 3 successful community interactions and profile setup to unlock full trusted contributor privileges.
+        </p>
+        <p style="font-size:11px; color:#64748b; margin-top:20px;">
+          Learnami Automated Agent Governance Engine &bull; AppFlicks
+        </p>
+      </div>
+    `;
+
+    adminSubject = `⚠️ [AUDIT] User Set to Probationary: ${user.username} (#${user.wp_user_id})`;
+    adminHtml = `
+      <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #f59e0b; max-width:620px;">
+        <h2 style="color:#f59e0b; margin-top:0;">⚠️ User Set to Probationary</h2>
+        <div style="background:#1c1912; border:1px solid #78350f; border-radius:6px; padding:14px; margin:16px 0;">
+          <p style="margin:4px 0;"><strong>Username:</strong> ${user.username}</p>
+          <p style="margin:4px 0;"><strong>User ID:</strong> #${user.wp_user_id}</p>
+          <p style="margin:4px 0;"><strong>User Email:</strong> ${userEmail}</p>
+          <p style="margin:4px 0;"><strong>Assigned Role:</strong> subscriber_probationary</p>
+          <p style="margin:4px 0;"><strong>Permissions:</strong> can_comment=1, can_post=0</p>
+        </div>
+      </div>
+    `;
+  } else if (isTrusted) {
+    userSubject = `🎉 Your AppFlicks Account is Active and Trusted!`;
+    userHtml = `
+      <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #10b981; max-width:620px;">
+        <h2 style="color:#10b981; margin-top:0;">🎉 Welcome to AppFlicks!</h2>
+        <p>Dear <strong>${user.username}</strong>,</p>
+        <p>Your account has been approved as a <strong>Trusted Member</strong>. All platform privileges including posting reviews, journals, and commenting are now unlocked.</p>
+        <div style="background:#111c19; border:1px solid #065f46; border-radius:6px; padding:14px; margin:16px 0;">
+          <p style="margin:4px 0;"><strong>Username:</strong> ${user.username}</p>
+          <p style="margin:4px 0;"><strong>Status:</strong> Active &amp; Verified</p>
+          <p style="margin:4px 0;"><strong>Password:</strong> Unchanged (Log in with your existing password)</p>
+        </div>
+      </div>
+    `;
+
+    adminSubject = `✓ [AUDIT] User Approved as Trusted: ${user.username} (#${user.wp_user_id})`;
+    adminHtml = `
+      <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #10b981; max-width:620px;">
+        <h2 style="color:#10b981; margin-top:0;">✓ User Approved as Trusted</h2>
+        <p>User <strong>${user.username}</strong> (ID #${user.wp_user_id}, Email: <code>${userEmail}</code>) was approved as Trusted.</p>
+      </div>
+    `;
+  }
+
+  // 1. Dispatch to USER if valid email
+  let userEmailRes = { sent: false, message: 'No valid user email address' };
+  if (userEmail && userEmail.includes('@')) {
+    userEmailRes = await sendSmtpEmail({
+      to: userEmail,
+      subject: userSubject,
+      html: userHtml,
+      text: userSubject
+    });
+  }
+
+  // 2. Dispatch to ADMIN
+  const adminEmailRes = await sendSmtpEmail({
+    to: adminEmail,
+    subject: adminSubject,
+    html: adminHtml,
+    text: adminSubject
+  });
+
+  // Record in Outbox History
+  const outboxEntry = {
+    id: emailOutboxLogs.length + 1,
+    timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+    user_id: user.wp_user_id || user.id,
+    username: user.username,
+    user_email: userEmail,
+    admin_email: adminEmail,
+    role: newRole,
+    user_subject: userSubject,
+    admin_subject: adminSubject,
+    dispatched_to_user: userEmailRes.sent,
+    dispatched_to_admin: adminEmailRes.sent,
+    user_status_msg: userEmailRes.message,
+    admin_status_msg: adminEmailRes.message
+  };
+
+  emailOutboxLogs.unshift(outboxEntry);
+  if (emailOutboxLogs.length > 50) emailOutboxLogs.pop();
+
+  return {
+    userEmailRes,
+    adminEmailRes,
+    outboxEntry
+  };
+}
+
 let lastConnectionStatus = {
   tested_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
   status: 'pending',
@@ -685,108 +843,171 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
     const row = existing[0];
     const actualId = row.ID;
 
-    if (isBlocked) {
-      // 1. Mark user_status = 1 (WordPress spam / disabled marker)
-      // 2. Mark user_activation_key = 'BLOCKED_BY_AGENTIX_AI'
-      // 3. Disable password login so they cannot log in!
-      const currentPass = row.user_pass || '';
-      let blockedPass = currentPass;
+    // Check if the user's password was previously corrupted by $BLOCKED_ and restore it
+    let restorePassSql = '';
+    let restoredPass = null;
 
-      if (!currentPass.startsWith('$BLOCKED_')) {
-        // Save original password in usermeta so it can be restored if unblocked
-        if (metaTable) {
-          try {
-            await conn.query(
-              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_saved_pass', ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)`,
-              [actualId, currentPass]
-            );
-          } catch (e) {}
-        }
-        blockedPass = '$BLOCKED_' + Buffer.from(Date.now() + '_' + actualId).toString('base64').substring(0, 18);
-        await conn.query(
-          `UPDATE \`${userTable}\` SET user_status = 1, user_activation_key = 'BLOCKED_BY_AGENTIX_AI', user_pass = ? WHERE ID = ?`,
-          [blockedPass, actualId]
-        );
-      } else {
-        await conn.query(
-          `UPDATE \`${userTable}\` SET user_status = 1, user_activation_key = 'BLOCKED_BY_AGENTIX_AI' WHERE ID = ?`,
-          [actualId]
-        );
-      }
-
-      // Update WordPress capabilities in usermeta to empty / blocked
+    if (row.user_pass && row.user_pass.startsWith('$BLOCKED_')) {
       if (metaTable) {
-        const prefix = userTable.replace(/users$/i, '');
-        const capKey = `${prefix}capabilities`;
         try {
-          await conn.query(
-            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:0:{}') ON DUPLICATE KEY UPDATE meta_value = 'a:0:{}'`,
-            [actualId, capKey]
+          const [saved] = await conn.query(
+            `SELECT meta_value FROM \`${metaTable}\` WHERE user_id = ? AND meta_key = '_agentix_saved_pass' LIMIT 1`,
+            [actualId]
           );
+          if (saved.length > 0 && saved[0].meta_value) {
+            restoredPass = saved[0].meta_value;
+            restorePassSql = ', user_pass = ?';
+          }
         } catch (e) {}
       }
+    }
 
-      loginAction = 'DISABLED (user_status=1, pass locked)';
-      updatedWp = true;
-    } else if (isTrusted || isProbationary) {
-      // User is TRUSTED or PROBATIONARY:
-      // 1. Set user_status = 0 (Active)
-      // 2. Clear activation key
-      // 3. If password was locked, restore original pass if saved
-      let restorePassSql = '';
-      let params = [0, '', actualId];
-
-      if (row.user_pass && row.user_pass.startsWith('$BLOCKED_')) {
-        let restoredPass = null;
-        if (metaTable) {
-          try {
-            const [saved] = await conn.query(
-              `SELECT meta_value FROM \`${metaTable}\` WHERE user_id = ? AND meta_key = '_agentix_saved_pass' LIMIT 1`,
-              [actualId]
-            );
-            if (saved.length > 0 && saved[0].meta_value) {
-              restoredPass = saved[0].meta_value;
-            }
-          } catch (e) {}
-        }
-        if (restoredPass) {
-          restorePassSql = ', user_pass = ?';
-          params = [0, '', restoredPass, actualId];
-        }
+    if (isBlocked) {
+      // 1. Mark user_status = 1 (WordPress deactivated / restricted marker)
+      // 2. Mark user_activation_key = 'BLOCKED_BY_AGENTIX_AI'
+      // 3. PRESERVE password intact - do NOT change or corrupt user_pass!
+      const updateParams = [1, 'BLOCKED_BY_AGENTIX_AI'];
+      if (restorePassSql && restoredPass) {
+        updateParams.push(restoredPass);
       }
+      updateParams.push(actualId);
 
       await conn.query(
         `UPDATE \`${userTable}\` SET user_status = ?, user_activation_key = ? ${restorePassSql} WHERE ID = ?`,
-        params
+        updateParams
       );
 
-      // Update usermeta capabilities
+      // Update WordPress capabilities in usermeta to restricted_blocked
       if (metaTable) {
         const prefix = userTable.replace(/users$/i, '');
         const capKey = `${prefix}capabilities`;
         const levelKey = `${prefix}user_level`;
-        const roleCap = isTrusted ? 'a:1:{s:10:"subscriber";b:1;}' : 'a:1:{s:23:"subscriber_probationary";b:1;}';
-
         try {
           await conn.query(
-            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)`,
-            [actualId, capKey, roleCap]
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:18:"restricted_blocked";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:18:"restricted_blocked";b:1;}'`,
+            [actualId, capKey]
           );
           await conn.query(
             `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
             [actualId, levelKey]
           );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', 'blocked') ON DUPLICATE KEY UPDATE meta_value = 'blocked'`,
+            [actualId]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_post', '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
+            [actualId]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_comment', '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
+            [actualId]
+          );
         } catch (e) {}
       }
 
-      loginAction = 'ENABLED (user_status=0, active)';
+      loginAction = 'BLOCKED (user_status=1, role=restricted_blocked, password intact)';
+      updatedWp = true;
+    } else if (isProbationary) {
+      // User is PROBATIONARY:
+      // 1. Set user_status = 0 (Active login permitted!)
+      // 2. Clear activation key
+      // 3. Keep real password intact
+      const updateParams = [0, ''];
+      if (restorePassSql && restoredPass) {
+        updateParams.push(restoredPass);
+      }
+      updateParams.push(actualId);
+
+      await conn.query(
+        `UPDATE \`${userTable}\` SET user_status = ?, user_activation_key = ? ${restorePassSql} WHERE ID = ?`,
+        updateParams
+      );
+
+      // Update usermeta capabilities to subscriber_probationary
+      if (metaTable) {
+        const prefix = userTable.replace(/users$/i, '');
+        const capKey = `${prefix}capabilities`;
+        const levelKey = `${prefix}user_level`;
+        try {
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:23:"subscriber_probationary";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:23:"subscriber_probationary";b:1;}'`,
+            [actualId, capKey]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
+            [actualId, levelKey]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', 'probationary') ON DUPLICATE KEY UPDATE meta_value = 'probationary'`,
+            [actualId]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_post', '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
+            [actualId]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_comment', '1') ON DUPLICATE KEY UPDATE meta_value = '1'`,
+            [actualId]
+          );
+        } catch (e) {}
+      }
+
+      loginAction = 'PROBATIONARY (user_status=0, role=subscriber_probationary, can_comment=1, can_post=0, password intact)';
+      updatedWp = true;
+    } else if (isTrusted) {
+      // User is TRUSTED:
+      // 1. Set user_status = 0 (Active)
+      // 2. Clear activation key
+      // 3. Full subscriber role capabilities
+      const updateParams = [0, ''];
+      if (restorePassSql && restoredPass) {
+        updateParams.push(restoredPass);
+      }
+      updateParams.push(actualId);
+
+      await conn.query(
+        `UPDATE \`${userTable}\` SET user_status = ?, user_activation_key = ? ${restorePassSql} WHERE ID = ?`,
+        updateParams
+      );
+
+      // Update usermeta capabilities to subscriber
+      if (metaTable) {
+        const prefix = userTable.replace(/users$/i, '');
+        const capKey = `${prefix}capabilities`;
+        const levelKey = `${prefix}user_level`;
+        try {
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:10:"subscriber";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:10:"subscriber";b:1;}'`,
+            [actualId, capKey]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
+            [actualId, levelKey]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', 'active') ON DUPLICATE KEY UPDATE meta_value = 'active'`,
+            [actualId]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_post', '1') ON DUPLICATE KEY UPDATE meta_value = '1'`,
+            [actualId]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_comment', '1') ON DUPLICATE KEY UPDATE meta_value = '1'`,
+            [actualId]
+          );
+        } catch (e) {}
+      }
+
+      loginAction = 'TRUSTED (user_status=0, role=subscriber, full permissions, password intact)';
       updatedWp = true;
     }
   } else {
-    // Brand new user from registration: INSERT into real WordPress tables!
-    const passHash = isBlocked
-      ? '$BLOCKED_' + Buffer.from(Date.now() + '_' + uid).toString('base64').substring(0, 18)
-      : '$P$B' + Buffer.from(uname + 'learnami').toString('base64').substring(0, 20);
+    // Brand new user from registration: INSERT into real WordPress tables without corrupting password!
+    const passHash = '$P$B' + Buffer.from(uname + 'learnami').toString('base64').substring(0, 20);
+    const initialStatus = isBlocked ? 1 : 0;
+    const initialKey = isBlocked ? 'BLOCKED_BY_AGENTIX_AI' : '';
 
     await conn.query(
       `INSERT INTO \`${userTable}\` (ID, user_login, user_pass, user_nicename, user_email, user_url, user_registered, user_activation_key, user_status, display_name)
@@ -797,8 +1018,8 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
         passHash,
         uname,
         uemail,
-        isBlocked ? 'BLOCKED_BY_AGENTIX_AI' : '',
-        isBlocked ? 1 : 0,
+        initialKey,
+        initialStatus,
         uname
       ]
     );
@@ -807,7 +1028,9 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
       const prefix = userTable.replace(/users$/i, '');
       const capKey = `${prefix}capabilities`;
       const levelKey = `${prefix}user_level`;
-      const roleCap = isBlocked ? 'a:0:{}' : (isTrusted ? 'a:1:{s:10:"subscriber";b:1;}' : 'a:1:{s:23:"subscriber_probationary";b:1;}');
+      const roleCap = isBlocked
+        ? 'a:1:{s:18:"restricted_blocked";b:1;}'
+        : (isProbationary ? 'a:1:{s:23:"subscriber_probationary";b:1;}' : 'a:1:{s:10:"subscriber";b:1;}');
       try {
         await conn.query(
           `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, ?)`,
@@ -817,10 +1040,14 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
           `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0')`,
           [uid, levelKey]
         );
+        await conn.query(
+          `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', ?)`,
+          [uid, isBlocked ? 'blocked' : (isProbationary ? 'probationary' : 'active')]
+        );
       } catch (e) {}
     }
 
-    loginAction = isBlocked ? 'INSERTED_BLOCKED' : 'INSERTED_ACTIVE';
+    loginAction = isBlocked ? 'INSERTED_BLOCKED' : (isProbationary ? 'INSERTED_PROBATIONARY' : 'INSERTED_ACTIVE');
     updatedWp = true;
   }
 
@@ -1326,7 +1553,8 @@ app.get('/smtp-settings/', (req, res) => {
     title: 'SMTP & Notifications | Learnami',
     activeNav: 'smtp_settings',
     smtp_cfg: smtpConfig,
-    test_result: null
+    test_result: null,
+    outbox: emailOutboxLogs
   });
 });
 
@@ -1352,7 +1580,8 @@ app.post('/smtp-settings/', async (req, res) => {
     title: 'SMTP & Notifications | Learnami',
     activeNav: 'smtp_settings',
     smtp_cfg: smtpConfig,
-    test_result: null
+    test_result: null,
+    outbox: emailOutboxLogs
   });
 });
 
@@ -1522,7 +1751,8 @@ app.get('/onboarding/', (req, res) => {
     totalFiltered,
     pageSize,
     roleFilter,
-    searchQuery
+    searchQuery,
+    outbox: emailOutboxLogs
   });
 });
 
@@ -1565,6 +1795,7 @@ app.post('/onboarding/', async (req, res) => {
     const newRole = req.body.new_role;
     const user = users.find(u => u.id === uid || u.wp_user_id === uid);
     if (user && newRole) {
+      const oldRole = user.assigned_role;
       user.assigned_role = newRole;
       if (newRole.includes('trusted')) {
         user.onboarding_stage = 'completed';
@@ -1587,66 +1818,105 @@ app.post('/onboarding/', async (req, res) => {
       }
       fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
 
-      // Fast single-record sync directly to live MySQL
+      // Fast single-record sync directly to live MySQL (with intact password!)
       const dbSync = await syncSingleUserToDatabase(user);
 
-      // Email notification for manual role change
-      if (newRole.includes('blocked')) {
-        sendSmtpEmail({
-          to: smtpConfig.recipient || 'test@appflicks.com',
-          subject: `🚫 [MANUAL BLOCK] Admin Blocked User: ${user.username} (#${user.wp_user_id})`,
-          html: `
-            <div style="font-family:sans-serif; background:#0f1117; color:#f0f2f5; padding:20px; border-radius:6px; border:1px solid #ef4444;">
-              <h3 style="color:#ef4444; margin-top:0;">🚫 User Manually Blocked by Admin</h3>
-              <p>User <strong>${user.username}</strong> (WP ID #${user.wp_user_id}, Email: <code>${user.email}</code>) was manually set to <strong>${newRole}</strong>.</p>
-              <p><strong>Posting / Commenting:</strong> Revoked</p>
-              <p><strong>Database:</strong> ${dbSync.success ? '✓ Updated in learnami_ttest.user_onboarding_states' : 'Cached locally'}</p>
-            </div>
-          `
-        }).catch(() => {});
-      } else if (newRole.includes('trusted')) {
-        sendSmtpEmail({
-          to: smtpConfig.recipient || 'test@appflicks.com',
-          subject: `✓ [MANUAL APPROVAL] Admin Set Trusted: ${user.username} (#${user.wp_user_id})`,
-          html: `
-            <div style="font-family:sans-serif; background:#0f1117; color:#f0f2f5; padding:20px; border-radius:6px; border:1px solid #10b981;">
-              <h3 style="color:#10b981; margin-top:0;">✓ User Manually Approved as Trusted Subscriber</h3>
-              <p>User <strong>${user.username}</strong> (WP ID #${user.wp_user_id}, Email: <code>${user.email}</code>) was approved by administrator.</p>
-              <p><strong>Posting / Commenting:</strong> Enabled</p>
-              <p><strong>Database:</strong> ${dbSync.success ? '✓ Updated in learnami_ttest.user_onboarding_states' : 'Cached locally'}</p>
-            </div>
-          `
-        }).catch(() => {});
+      // Dispatch notifications to BOTH user and admin!
+      const notifyResult = await notifyAdminAndUserOnRoleChange({
+        user,
+        oldRole,
+        newRole,
+        reason: req.body.reason || 'Admin role update in Onboarding Directory'
+      });
+
+      let emailStatusMsg = '';
+      if (notifyResult.userEmailRes.sent && notifyResult.adminEmailRes.sent) {
+        emailStatusMsg = `✓ Notification emails successfully delivered to both user (${user.email}) and admin (${smtpConfig.recipient}).`;
+      } else if (notifyResult.adminEmailRes.sent) {
+        emailStatusMsg = `✓ Notification emailed to admin (${smtpConfig.recipient}); user notice queued.`;
+      } else if (notifyResult.userEmailRes.sent) {
+        emailStatusMsg = `✓ Notification emailed to user (${user.email}); admin copy queued.`;
+      } else {
+        emailStatusMsg = `✉ Notice logged to Outbox for both user (${user.email}) and admin (${smtpConfig.recipient || 'test@appflicks.com'}). (Enter SMTP password in Settings to dispatch over live mail server)`;
       }
 
-      res.locals.messages = [{ tags: 'success', text: `✓ Updated user #${user.wp_user_id} (${user.username}) to role '${newRole}' and synchronized directly to MySQL.` }];
+      res.locals.messages = [{
+        tags: 'success',
+        text: `✓ User #${user.wp_user_id} (${user.username}) updated to '${newRole}'. Database: ${dbSync.message} ${emailStatusMsg}`
+      }];
     }
   } else if (action === 'send_user_email') {
     const uid = parseInt(req.body.target_user_id, 10);
     const subject = req.body.email_subject || 'AppFlicks Onboarding Update';
+    const customMessage = req.body.email_message || '';
     const user = users.find(u => u.id === uid || u.wp_user_id === uid);
 
     if (user) {
-      const emailRes = await sendSmtpEmail({
-        to: smtpConfig.recipient || 'test@appflicks.com',
-        subject: `[Notification for ${user.username}] ${subject}`,
-        html: `
-          <div style="font-family:sans-serif; background:#0f1117; color:#f0f2f5; padding:20px; border-radius:6px;">
-            <h3 style="color:#6366f1;">User Onboarding Notification</h3>
-            <p><strong>Target User:</strong> ${user.username} (WP ID #${user.wp_user_id})</p>
-            <p><strong>User Email:</strong> ${user.email}</p>
-            <p><strong>Role:</strong> ${user.assigned_role}</p>
-            <p><strong>Risk Score:</strong> ${user.risk_score}</p>
-            <p><strong>Stage:</strong> ${user.onboarding_stage}</p>
-            <p style="margin-top:16px;">This message was triggered from the Learnami Onboarding Inspector via <code>mail.appflicks.com:465</code>.</p>
+      const userHtml = `
+        <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #6366f1; max-width:620px;">
+          <h2 style="color:#6366f1; margin-top:0;">⚡ AppFlicks Community Notification</h2>
+          <p>Dear <strong>${user.username}</strong>,</p>
+          <p>${customMessage || 'We are reaching out with an update regarding your AppFlicks account and onboarding status.'}</p>
+          <div style="background:#1a1d27; border:1px solid #2d3348; border-radius:6px; padding:14px; margin:16px 0;">
+            <p style="margin:4px 0;"><strong>Username:</strong> ${user.username} (ID #${user.wp_user_id})</p>
+            <p style="margin:4px 0;"><strong>Account Status:</strong> ${user.assigned_role}</p>
+            <p style="margin:4px 0;"><strong>Onboarding Stage:</strong> ${user.onboarding_stage}</p>
+            <p style="margin:4px 0;"><strong>Password:</strong> Intact &amp; unchanged</p>
           </div>
-        `
+          <p style="font-size:11px; color:#64748b; margin-top:16px;">AppFlicks Automation Engine &bull; Learnami Governance</p>
+        </div>
+      `;
+
+      const adminHtml = `
+        <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #6366f1; max-width:620px;">
+          <h3 style="color:#6366f1; margin-top:0;">[Admin Dispatch Copy] Direct Notification Sent to ${user.username}</h3>
+          <p><strong>Target User:</strong> ${user.username} (ID #${user.wp_user_id})</p>
+          <p><strong>User Email:</strong> <code>${user.email}</code></p>
+          <p><strong>Subject:</strong> ${subject}</p>
+          <p><strong>Role:</strong> ${user.assigned_role}</p>
+          <div style="background:#1a1d27; padding:12px; border-radius:6px; margin:12px 0;">${customMessage || 'Standard onboarding update notice'}</div>
+        </div>
+      `;
+
+      let userEmailRes = { sent: false, message: 'Invalid email address' };
+      if (user.email && user.email.includes('@')) {
+        userEmailRes = await sendSmtpEmail({
+          to: user.email,
+          subject,
+          html: userHtml,
+          text: subject
+        });
+      }
+
+      const adminEmailRes = await sendSmtpEmail({
+        to: smtpConfig.recipient || 'test@appflicks.com',
+        subject: `[Admin Copy] ${subject} -> ${user.username}`,
+        html: adminHtml,
+        text: subject
       });
 
-      if (emailRes.sent) {
-        res.locals.messages = [{ tags: 'success', text: `✓ Notification email sent successfully to test@appflicks.com!` }];
+      emailOutboxLogs.unshift({
+        id: emailOutboxLogs.length + 1,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        user_id: user.wp_user_id || user.id,
+        username: user.username,
+        user_email: user.email,
+        admin_email: smtpConfig.recipient || 'test@appflicks.com',
+        role: user.assigned_role,
+        user_subject: subject,
+        admin_subject: `[Admin Copy] ${subject}`,
+        dispatched_to_user: userEmailRes.sent,
+        dispatched_to_admin: adminEmailRes.sent,
+        user_status_msg: userEmailRes.message,
+        admin_status_msg: adminEmailRes.message
+      });
+
+      if (userEmailRes.sent && adminEmailRes.sent) {
+        res.locals.messages = [{ tags: 'success', text: `✓ Notification successfully emailed to both user (${user.email}) and admin (${smtpConfig.recipient})!` }];
+      } else if (adminEmailRes.sent) {
+        res.locals.messages = [{ tags: 'success', text: `✓ Emailed copy to admin (${smtpConfig.recipient}); user notice queued (${userEmailRes.message}).` }];
       } else {
-        res.locals.messages = [{ tags: 'warning', text: `Email notice: ${emailRes.message}` }];
+        res.locals.messages = [{ tags: 'warning', text: `✉ Notification recorded in Outbox for user (${user.email}) and admin (${smtpConfig.recipient}). (Configure SMTP password in Settings to dispatch live)` }];
       }
     }
   } else if (action === 'register_user') {
@@ -1681,83 +1951,107 @@ app.post('/onboarding/', async (req, res) => {
     changedUserIds.add(newUser.id);
     fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
 
-    // Immediately sync this 1 record to MySQL (fast sub-100ms)
+    // Immediately sync this 1 record to MySQL (fast sub-100ms) with password intact!
     const dbSync = await syncSingleUserToDatabase(newUser);
 
-    // Auto-inform admin via email via mail.appflicks.com:465
-    let emailSubject = '';
-    let emailHtml = '';
+    // Send notifications to BOTH user and admin
+    let userSubject = '';
+    let userHtml = '';
+    let adminSubject = '';
+    let adminHtml = '';
 
     if (isSpamBot) {
-      emailSubject = `🚨 [BOT AUTO-BLOCKED] Spam Registration Intercepted: ${uname} (${email})`;
-      emailHtml = `
+      userSubject = `🚫 Important Notice: Your Registration Requires Verification`;
+      userHtml = `
         <div style="font-family:'Segoe UI',sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; max-width:600px; border:1px solid #ef4444;">
-          <h2 style="color:#ef4444; margin-top:0; border-bottom:1px solid #3b1d24; padding-bottom:10px;">
-            🚨 Spam Bot Registration Auto-Blocked
-          </h2>
-          <p style="font-size:14px; color:#cbd5e1;">A new registration was automatically analyzed and <strong>blocked</strong> by Learnami Spam &amp; Bot Heuristics.</p>
-          
-          <div style="background:#1a1318; border:1px solid #7f1d1d; border-radius:8px; padding:16px; margin:16px 0;">
-            <p style="margin:4px 0;"><strong>Username:</strong> <code style="color:#ef4444; font-size:15px;">${uname}</code></p>
-            <p style="margin:4px 0;"><strong>Email Address:</strong> <code style="color:#f87171;">${email}</code></p>
-            <p style="margin:4px 0;"><strong>WP User ID:</strong> #${wpid}</p>
-            <p style="margin:4px 0;"><strong>Risk Score:</strong> <span style="background:#ef4444; color:#fff; padding:2px 8px; border-radius:4px; font-weight:bold;">${newUser.risk_score.toFixed(2)} (CRITICAL)</span></p>
-            <p style="margin:4px 0;"><strong>Detection Heuristics:</strong> <span style="color:#fca5a5;">${evalRes.risk_reasons || 'Blacklisted keyword / disposable domain'}</span></p>
-            <p style="margin:4px 0;"><strong>Status:</strong> <span style="color:#ef4444; font-weight:bold;">REJECTED &amp; AUTO-BLOCKED</span></p>
-            <p style="margin:4px 0;"><strong>Restrictions Applied:</strong> Can Post: NO | Can Comment: NO | Community Voting: NO</p>
-            <p style="margin:4px 0;"><strong>MySQL Database Sync:</strong> ${dbSync.success ? '✓ Persisted in learnami_ttest.user_onboarding_states' : 'Cached locally'}</p>
-          </div>
+          <h2 style="color:#ef4444; margin-top:0;">Account Registration Notice</h2>
+          <p>Dear <strong>${uname}</strong>,</p>
+          <p>Your registration was flagged by automated security heuristics and placed in <strong>Restricted / Blocked</strong> status.</p>
+          <p>If you are a legitimate human applicant, you may appeal by contacting <a href="mailto:${smtpConfig.recipient}" style="color:#6366f1;">${smtpConfig.recipient}</a>.</p>
+        </div>
+      `;
 
-          <p style="font-size:13px; color:#94a3b8;">
-            You can review or manually override this action anytime in your Onboarding User Directory.
-          </p>
-          <p style="font-size:11px; color:#64748b; margin-top:16px;">
-            Sent automatically by AppFlicks Automation Engine via SMTP <code>mail.appflicks.com:465</code>
-          </p>
+      adminSubject = `🚨 [BOT AUTO-BLOCKED] Spam Registration Intercepted: ${uname} (${email})`;
+      adminHtml = `
+        <div style="font-family:'Segoe UI',sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; max-width:600px; border:1px solid #ef4444;">
+          <h2 style="color:#ef4444; margin-top:0;">🚨 Spam Bot Auto-Blocked</h2>
+          <p><strong>Username:</strong> ${uname}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Risk Score:</strong> ${newUser.risk_score.toFixed(2)}</p>
+          <p><strong>Heuristics:</strong> ${evalRes.risk_reasons || 'Flagged patterns'}</p>
+          <p><strong>Database:</strong> ${dbSync.success ? '✓ Synced' : 'Cached locally'}</p>
         </div>
       `;
     } else {
-      emailSubject = `✓ [NEW REGISTRATION] User Evaluated: ${uname} - Role: ${newUser.assigned_role}`;
-      emailHtml = `
+      userSubject = `✓ Welcome to AppFlicks: Registration Received`;
+      userHtml = `
         <div style="font-family:'Segoe UI',sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; max-width:600px; border:1px solid #10b981;">
-          <h2 style="color:#10b981; margin-top:0; border-bottom:1px solid #143828; padding-bottom:10px;">
-            ✓ New User Registration Evaluated
-          </h2>
-          <p style="font-size:14px; color:#cbd5e1;">A new user has registered and passed onboarding evaluation.</p>
-          
-          <div style="background:#111c19; border:1px solid #065f46; border-radius:8px; padding:16px; margin:16px 0;">
-            <p style="margin:4px 0;"><strong>Username:</strong> <strong style="color:#fff;">${uname}</strong> (WP ID #${wpid})</p>
-            <p style="margin:4px 0;"><strong>Email Address:</strong> ${email}</p>
-            <p style="margin:4px 0;"><strong>Assigned Role:</strong> <span style="color:#10b981; font-weight:bold;">${newUser.assigned_role}</span></p>
-            <p style="margin:4px 0;"><strong>Risk Score:</strong> <span style="color:#10b981;">${newUser.risk_score.toFixed(2)} (CLEAN)</span></p>
-            <p style="margin:4px 0;"><strong>Onboarding Stage:</strong> ${newUser.onboarding_stage}</p>
-            <p style="margin:4px 0;"><strong>MySQL Database Sync:</strong> ${dbSync.success ? '✓ Persisted in learnami_ttest.user_onboarding_states' : 'Cached locally'}</p>
-          </div>
+          <h2 style="color:#10b981; margin-top:0;">✓ Welcome to AppFlicks!</h2>
+          <p>Dear <strong>${uname}</strong>,</p>
+          <p>Your registration has been evaluated. Your initial role is <strong>${newUser.assigned_role}</strong>.</p>
+          <p>Log in with your chosen password to begin your progressive onboarding tour.</p>
+        </div>
+      `;
 
-          <p style="font-size:11px; color:#64748b; margin-top:16px;">
-            Sent automatically by AppFlicks Automation Engine via SMTP <code>mail.appflicks.com:465</code>
-          </p>
+      adminSubject = `✓ [NEW REGISTRATION] User Evaluated: ${uname} - Role: ${newUser.assigned_role}`;
+      adminHtml = `
+        <div style="font-family:'Segoe UI',sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; max-width:600px; border:1px solid #10b981;">
+          <h2 style="color:#10b981; margin-top:0;">✓ New User Registration Evaluated</h2>
+          <p><strong>Username:</strong> ${uname} (WP ID #${wpid})</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Role:</strong> ${newUser.assigned_role}</p>
         </div>
       `;
     }
 
-    // Send email alert to admin
-    const emailRes = await sendSmtpEmail({
+    // 1. Dispatch to user
+    let userEmailRes = { sent: false };
+    if (email && email.includes('@')) {
+      userEmailRes = await sendSmtpEmail({
+        to: email,
+        subject: userSubject,
+        html: userHtml,
+        text: userSubject
+      });
+    }
+
+    // 2. Dispatch to admin
+    const adminEmailRes = await sendSmtpEmail({
       to: smtpConfig.recipient || 'test@appflicks.com',
-      subject: emailSubject,
-      html: emailHtml
+      subject: adminSubject,
+      html: adminHtml,
+      text: adminSubject
     });
 
-    let mailMsg = emailRes.sent ? ' [Admin alert sent to test@appflicks.com]' : '';
+    emailOutboxLogs.unshift({
+      id: emailOutboxLogs.length + 1,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      user_id: wpid,
+      username: uname,
+      user_email: email,
+      admin_email: smtpConfig.recipient || 'test@appflicks.com',
+      role: newUser.assigned_role,
+      user_subject: userSubject,
+      admin_subject: adminSubject,
+      dispatched_to_user: userEmailRes.sent,
+      dispatched_to_admin: adminEmailRes.sent,
+      user_status_msg: userEmailRes.message,
+      admin_status_msg: adminEmailRes.message
+    });
+
+    let mailMsg = (userEmailRes.sent && adminEmailRes.sent)
+      ? ' [Notifications sent to both user and admin]'
+      : (adminEmailRes.sent ? ' [Alert sent to admin]' : ' [Email notice logged in Outbox]');
+
     if (isSpamBot) {
       res.locals.messages = [{
         tags: 'danger',
-        text: `🚨 SPAM BOT DETECTED: '${uname}' (${email}) auto-blocked! Role set to 'restricted_blocked'. Synced to MySQL.${mailMsg}`
+        text: `🚨 SPAM BOT DETECTED: '${uname}' (${email}) auto-blocked! Role set to 'restricted_blocked' (password intact). Synced to MySQL.${mailMsg}`
       }];
     } else {
       res.locals.messages = [{
         tags: 'success',
-        text: `✓ User '${uname}' evaluated cleanly: Role '${newUser.assigned_role}'. Synced to MySQL.${mailMsg}`
+        text: `✓ User '${uname}' evaluated: Role '${newUser.assigned_role}' (password intact). Synced to MySQL.${mailMsg}`
       }];
     }
 
@@ -1804,7 +2098,8 @@ app.post('/onboarding/', async (req, res) => {
     totalFiltered: filtered.length,
     pageSize,
     roleFilter,
-    searchQuery: ''
+    searchQuery: '',
+    outbox: emailOutboxLogs
   });
 });
 

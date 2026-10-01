@@ -3,7 +3,7 @@
   "port": 465,
   "secure": true,
   "user": "test@appflicks.com",
-  "pass": "",
+  "pass": "Qwater123@",
   "from": "\"AppFlicks Automation\" <test@appflicks.com>",
   "recipient": "test@appflicks.com",
   "notify_on_batch": true,
