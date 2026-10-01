@@ -472,21 +472,23 @@ let snapshots = [
 ];
 
 const TRUSTED_DOMAINS = new Set([
-  'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.uk', 'yahoo.ca',
+  'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.uk', 'yahoo.ca', 'yahoo.com.ph', 'yahoo.co.in', 'yahoo.com.au',
   'hotmail.com', 'outlook.com', 'live.com', 'msn.com',
   'icloud.com', 'me.com', 'mac.com',
   'aol.com', 'zoho.com', 'proton.me', 'protonmail.com',
-  'appflicks.com', 'learnami.com'
+  'rogers.com', 'appflicks.com', 'learnami.com'
 ]);
 
-// Heuristics
+// Known Disposable & Automated Bot-farm Domains
 const DISPOSABLE_DOMAINS = new Set([
   'mailinator.com', 'guerrillamail.com', 'sharklasers.com',
   'tempmail.com', 'yopmail.com', '10minutemail.com', 'dispostable.com',
   'thinhmin.com', 'code-gmail.com', 'chahcyrans.com', 'dmxs8.com', 'setxko.com',
   'theking.id', 'problemno.shop', 'skachat-na-android.com', 'igurant1.online',
   'phanmembanhang24h.com', 'ruutukf.com', 'fakemail.net', 'throwawaymail.com',
-  'mohmal.com', 'trashmail.com', 'temp-mail.org', 'crazymailing.com'
+  'mohmal.com', 'trashmail.com', 'temp-mail.org', 'crazymailing.com',
+  'biumemail.com', '1secmail.com', 'ssdmails.com', 'mailfranco.com',
+  'westrb.com', 'ovaki.com', 'iskba.com', 'georonbuzztal.online', 'guyclearsecso.online'
 ]);
 
 const HIGH_RISK_TLDS = ['.shop', '.store', '.online', '.id', '.ru', '.top', '.xyz', '.site', '.win', '.club', '.icu', '.best', '.buzz', '.monster'];
@@ -496,77 +498,95 @@ const SPAM_PATTERNS = [
   'aviator', 'payout', 'blockchain', 'btc', 'withdraw', 'free-btc', 'skachat', 'problemno'
 ];
 
-// Helper: Check if string has bot / gibberish characteristics
-function isGibberishBotString(str) {
-  if (!str || typeof str !== 'string') return false;
-  const s = str.trim().toLowerCase();
-  if (s.length < 5) return false;
+// Helper 1: Chaos Mixed-Case Bot Detection (e.g. XunkFQpCRwehPIx, yPZbrOmvxCFGhRo, kAFrHlNYmVS)
+function isChaosCaseBot(str) {
+  if (!str || str.length < 8) return false;
+  const upperCount = (str.match(/[A-Z]/g) || []).length;
+  const lowerCount = (str.match(/[a-z]/g) || []).length;
+  if (upperCount >= 3 && lowerCount >= 3) {
+    const isPascal = /^[A-Z][a-z]+([A-Z][a-z]+)*[0-9]*$/.test(str);
+    const isMc = /^(Mc|Mac)[A-Z][a-z]+[0-9]*$/i.test(str);
+    if (!isPascal && !isMc) {
+      return true; // Irregular mixed-case bot hash token
+    }
+  }
+  return false;
+}
 
-  // Pattern 1: Digits interleaved inside random letters (e.g. goc6ie2znn, x8k2m9p, ab12cd34)
-  const interleavedDigits = /[a-z]+[0-9]+[a-z]+/i.test(s) || /[0-9]+[a-z]+[0-9]+/i.test(s);
-  
-  // Pattern 2: High consonant clustering (4 or more consecutive consonants, unpronounceable)
-  const consonantClusters = /[^aeiou0-9_]{4,}/i.test(s);
-
-  // Pattern 3: Random hex / hash string (e.g., md5 or random 8-16 char bot token)
-  const hexBotToken = /^[a-f0-9]{8,32}$/i.test(s) && /[0-9]/.test(s) && /[a-f]/.test(s);
-
-  // Pattern 4: Exactly matches random alphanumeric generator length (8 to 12 chars with letters and digits)
-  const alphanumericJumble = s.length >= 8 && s.length <= 14 && /^[a-z0-9]+$/i.test(s) && (s.match(/\d/g) || []).length >= 2 && (s.match(/[a-z]/ig) || []).length >= 4;
-
-  return interleavedDigits || consonantClusters || hexBotToken || alphanumericJumble;
+// Helper 2: Embedded Digits Bot Generator Detection (e.g. goc6ie2znn -> digits embedded inside consonant clusters)
+function isBotGibberish(str) {
+  if (!str) return false;
+  if (/[a-z]{2,}[0-9]+[a-z]{2,}[0-9]+[a-z]+/i.test(str)) return true;
+  return false;
 }
 
 function evaluateRegistration(username, email, wpid = null) {
-  const unameLower = (username || '').toLowerCase();
+  const uname = username || '';
+  const unameLower = uname.toLowerCase();
   const emailLower = (email || '').toLowerCase();
   const domain = emailLower.includes('@') ? emailLower.split('@')[1] : '';
-  const emailLocal = emailLower.includes('@') ? emailLower.split('@')[0] : '';
 
-  // 1. VIP / PRIMARY ADMINISTRATOR IMMUNITY (WP ID #1, ronvining, site admin)
+  // 1. VIP / PRIMARY ADMINISTRATOR & OFFICIAL APPLFLICKS IMMUNITY
   if (
     wpid === 1 ||
-    wpid === '1' ||
+    String(wpid) === '1' ||
     unameLower === 'ronvining' ||
     emailLower === 'ronvining@gmail.com' ||
     unameLower === 'admin' ||
     unameLower === 'administrator' ||
+    domain === 'appflicks.com' ||
+    domain === 'learnami.com' ||
     (typeof smtpConfig !== 'undefined' && smtpConfig && smtpConfig.recipient && emailLower === smtpConfig.recipient.toLowerCase())
   ) {
     return {
       evaluation_status: 'approved',
       risk_score: 0.0,
-      risk_reasons: 'primary_administrator_immunity (WP ID #1 / Site Owner)',
+      risk_reasons: 'primary_administrator_or_official_brand (Immune)',
       onboarding_stage: 'completed',
-      assigned_role: 'administrator'
+      assigned_role: (wpid === 1 || unameLower === 'ronvining') ? 'administrator' : 'subscriber_trusted'
     };
   }
 
   let risk_score = 0.0;
   const reasons = [];
 
-  // 2. Known Disposable Domain check
-  if (DISPOSABLE_DOMAINS.has(domain)) {
-    risk_score += 0.90;
-    reasons.push('disposable_or_spam_domain');
+  // 2. Chaos-cased random bot hash token (e.g. XunkFQpCRwehPIx, yPZbrOmvxCFGhRo)
+  if (isChaosCaseBot(uname)) {
+    risk_score += 0.95;
+    reasons.push('chaos_case_bot_generator_token');
   }
 
-  // 3. High Risk TLDs
+  // 3. Embedded digits inside consonants (e.g. goc6ie2znn)
+  if (isBotGibberish(unameLower)) {
+    risk_score += 0.90;
+    reasons.push('embedded_digits_bot_pattern');
+  }
+
+  // 4. Known Disposable or Bot Farm Domain (matches domain or subdomain, e.g. *.westrb.com)
+  for (const disp of DISPOSABLE_DOMAINS) {
+    if (domain === disp || domain.endsWith('.' + disp)) {
+      risk_score += 0.95;
+      reasons.push(`disposable_spam_domain:${domain}`);
+      break;
+    }
+  }
+
+  // 5. High-Risk Spam TLDs (.online, .ru, .xyz, etc.)
   for (const tld of HIGH_RISK_TLDS) {
     if (domain.endsWith(tld)) {
-      risk_score += 0.60;
+      risk_score += 0.85;
       reasons.push(`high_risk_tld:${tld}`);
       break;
     }
   }
 
-  // 4. Fake Gmail or Typosquatting
+  // 6. Fake Gmail or Typosquatting
   if (domain.includes('gmail') && domain !== 'gmail.com' && domain !== 'googlemail.com') {
     risk_score += 0.90;
     reasons.push('fake_gmail_domain');
   }
 
-  // 5. Spam keywords
+  // 7. Spam keywords
   for (const pattern of SPAM_PATTERNS) {
     if (unameLower.includes(pattern) || emailLower.includes(pattern)) {
       risk_score += 0.75;
@@ -574,32 +594,22 @@ function evaluateRegistration(username, email, wpid = null) {
     }
   }
 
-  // 6. Gibberish Bot Pattern in Username or Email (e.g. goc6ie2znn)
-  const isUnameBot = isGibberishBotString(unameLower);
-  const isEmailLocalBot = isGibberishBotString(emailLocal);
-  const isDomainGibberish = isGibberishBotString(domain.split('.')[0]);
+  // 8. Domain Trust Classification
+  const isTrustedDomain = TRUSTED_DOMAINS.has(domain) || domain.endsWith('.edu') || domain.endsWith('.gov') || domain.endsWith('.mil');
 
-  if (isUnameBot) {
-    risk_score += 0.55;
-    reasons.push('bot_gibberish_username_pattern');
-  }
-
-  if (isEmailLocalBot) {
-    risk_score += 0.45;
-    reasons.push('bot_gibberish_email_prefix');
-  }
-
-  // 7. Obscure / Disposable Domain with no trust history (e.g., ruutukf.com)
-  const isTrustedDomain = TRUSTED_DOMAINS.has(domain);
-  if (!isTrustedDomain) {
-    if (isDomainGibberish || (isUnameBot && unameLower === emailLocal)) {
-      // Auto-generated bot domain like ruutukf.com where user is goc6ie2znn@ruutukf.com
-      risk_score += 0.60;
-      reasons.push(`unrecognized_bot_domain:${domain}`);
-    } else {
-      // Unknown domain default policy: starts with slight caution (probationary)
-      risk_score += 0.35;
-      reasons.push(`unverified_domain:${domain}`);
+  if (isTrustedDomain) {
+    // Legitimate domain (Gmail, Yahoo, Rogers, Outlook, etc.)
+    // If not flagged as a bot, it is a trusted human member!
+    if (risk_score === 0.0) {
+      risk_score = 0.05;
+      reasons.push('verified_consumer_or_telecom_domain');
+    }
+  } else {
+    // Custom / unrecognized domain
+    // If no explicit spam pattern was detected, place under Supervised Probation (NOT auto-blocked!)
+    if (risk_score < 0.7) {
+      risk_score = Math.max(risk_score, 0.35);
+      reasons.push(`unverified_custom_domain:${domain}`);
     }
   }
 
