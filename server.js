@@ -363,131 +363,18 @@ let lastConnectionStatus = {
   tables_found: []
 };
 
-// ==========================================
-// 4,000 WordPress Users Cohort Generator
-// (Exact match: 3198 Trusted, 401 Probationary, 401 Blocked)
-// ==========================================
-function generateWordPressCohort(targetCount = 4000) {
-  const generated = [];
-  const trustedCount = 3198;
-  const probCount = 401;
-  const blockedCount = targetCount - trustedCount - probCount; // 401
-
-  // 1. Trusted Subscribers (3,198)
-  const firstNames = ['alex', 'emma', 'liam', 'olivia', 'noah', 'ava', 'ethan', 'sophia', 'mason', 'isabella', 'william', 'mia', 'james', 'charlotte', 'benjamin', 'amelia', 'lucas', 'harper', 'henry', 'evelyn', 'daniel', 'hannah', 'ron', 'cora', 'lily', 'bill'];
-  const nouns = ['critic', 'reviewer', 'cinephile', 'gamer', 'writer', 'curator', 'filmmaker', 'reader', 'analyst', 'director', 'editor', 'scholar', 'aficionado', 'vining', 'pro'];
-  const domains = ['gmail.com', 'yahoo.com', 'outlook.com', 'icloud.com', 'proton.me', 'appflicks.com'];
-
-  for (let i = 0; i < trustedCount; i++) {
-    const fn = firstNames[i % firstNames.length];
-    const n = nouns[Math.floor(i / firstNames.length) % nouns.length];
-    const suffix = i >= firstNames.length ? `_${i + 1}` : '';
-    const uname = `${fn}_${n}${suffix}`;
-    const dom = domains[i % domains.length];
-    const email = `${uname}@${dom}`;
-    const id = 101 + i;
-    generated.push({
-      id,
-      wp_user_id: id,
-      username: uname,
-      email,
-      email_verified: true,
-      age: 20 + (i % 45),
-      location: ['US', 'CA', 'UK', 'AU', 'DE', 'FR', 'JP'][i % 7],
-      bio: `Verified member and community contributor #${id}.`,
-      avatar_completed: true,
-      assigned_role: 'subscriber_trusted',
-      onboarding_stage: 'completed',
-      evaluation_status: 'approved',
-      risk_score: parseFloat((0.02 + ((i % 15) * 0.01)).toFixed(2)),
-      can_post: true,
-      can_comment: true,
-      can_vote: true,
-      created_at: new Date(Date.now() - (i * 3600000 * 2)).toISOString().replace('T', ' ').substring(0, 16)
-    });
-  }
-
-  // 2. Probationary / Asks Pending (401)
-  const probDomains = ['fastmail.com', 'zoho.com', 'inbox.lv', 'mail.com', 'gmx.com'];
-  for (let i = 0; i < probCount; i++) {
-    const uname = `prob_user_${i + 1}`;
-    const dom = probDomains[i % probDomains.length];
-    const email = `${uname}@${dom}`;
-    const id = 101 + trustedCount + i;
-    generated.push({
-      id,
-      wp_user_id: id,
-      username: uname,
-      email,
-      email_verified: false,
-      age: null,
-      location: 'US',
-      bio: '',
-      avatar_completed: false,
-      assigned_role: 'subscriber_probationary',
-      onboarding_stage: 'progressive_asks',
-      evaluation_status: 'approved',
-      risk_score: parseFloat((0.32 + ((i % 16) * 0.01)).toFixed(2)),
-      can_post: false,
-      can_comment: true,
-      can_vote: false,
-      created_at: new Date(Date.now() - (i * 7200000)).toISOString().replace('T', ' ').substring(0, 16)
-    });
-  }
-
-  // 3. Blocked / Bot Traps (401)
-  const spamKeywords = ['casino', 'crypto', 'viagra', '1xbet', '888starz', 'aviator', 'payout', 'free-btc', 'backlink', 'bot'];
-  const spamDomains = ['mailinator.com', 'sharklasers.com', 'tempmail.com', 'thinhmin.com', 'dmxs8.com', 'problemno.shop', '1win.id', 'igurant1.online'];
-  for (let i = 0; i < blockedCount; i++) {
-    const kw = spamKeywords[i % spamKeywords.length];
-    const uname = `spambot_${kw}_${i + 1}`;
-    const dom = spamDomains[i % spamDomains.length];
-    const email = `bot${i + 1}@${dom}`;
-    const id = 101 + trustedCount + probCount + i;
-    generated.push({
-      id,
-      wp_user_id: id,
-      username: uname,
-      email,
-      email_verified: false,
-      age: null,
-      location: 'RU',
-      bio: `Get free bonus spins at our platform!`,
-      avatar_completed: false,
-      assigned_role: 'restricted_blocked',
-      onboarding_stage: 'escalated',
-      evaluation_status: 'rejected',
-      risk_score: parseFloat((0.80 + ((i % 19) * 0.01)).toFixed(2)),
-      can_post: false,
-      can_comment: false,
-      can_vote: false,
-      created_at: new Date(Date.now() - (i * 1800000)).toISOString().replace('T', ' ').substring(0, 16)
-    });
-  }
-
-  return generated;
-}
-
-// In-Memory Data Store
+// In-Memory Real Users Store (strictly populated from connected MySQL database)
 let users = [];
 
-// Try to load cached users if available
+// Load real cached users if available
 if (fs.existsSync(USERS_CACHE_FILE)) {
   try {
-    users = JSON.parse(fs.readFileSync(USERS_CACHE_FILE, 'utf8'));
-    console.log(`Loaded ${users.length} users from cache file.`);
+    const raw = fs.readFileSync(USERS_CACHE_FILE, 'utf8');
+    users = JSON.parse(raw);
+    console.log(`Loaded ${users.length} real user(s) from cache.`);
   } catch (e) {
     users = [];
   }
-}
-
-// Ensure the 4,000 WordPress cohort is active
-if (!users || users.length < 4000) {
-  users = generateWordPressCohort(4000);
-  try {
-    fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
-    console.log(`Initialized 4,000 WordPress users cohort.`);
-  } catch (e) {}
 }
 
 let submissions = [
@@ -1104,8 +991,307 @@ async function syncSingleUserToDatabase(user) {
 }
 
 // ==========================================
+// Auto-Detection & Automated Processing for NEW WordPress Registrations
+// Automatically checks for new sign-ups in WordPress, applies policy actions,
+// and dispatches instant security alert emails to the administrator.
+// ==========================================
+async function detectAndProcessNewRegistrations() {
+  if (!dbConfig.USER || !dbConfig.PASSWORD) {
+    return { success: false, reason: 'MySQL credentials not configured in Database Setup.' };
+  }
+
+  let conn = null;
+  try {
+    conn = await mysql.createConnection({
+      host: dbConfig.HOST,
+      port: parseInt(dbConfig.PORT || '3306', 10),
+      user: dbConfig.USER,
+      password: dbConfig.PASSWORD,
+      database: dbConfig.NAME,
+      connectTimeout: 5000
+    });
+
+    const [tableRows] = await conn.query('SHOW TABLES');
+    const tableNames = tableRows.map(r => Object.values(r)[0]);
+    const { userTable, metaTable } = findWordPressTables(tableNames);
+
+    if (!userTable) {
+      await conn.end();
+      return { success: false, reason: 'WordPress user table not found in database.' };
+    }
+
+    // Ensure user_onboarding_states table exists
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS user_onboarding_states (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        wp_user_id BIGINT NOT NULL UNIQUE,
+        onboarding_stage VARCHAR(50) DEFAULT 'progressive_asks',
+        assigned_role VARCHAR(50) DEFAULT 'subscriber_probationary',
+        risk_score DECIMAL(4,2) DEFAULT 0.00,
+        evaluation_status VARCHAR(50) DEFAULT 'pending',
+        email_verified TINYINT(1) DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Ultra-fast query: Find only users in WordPress that have not yet been analyzed/recorded in user_onboarding_states
+    const [newUsers] = await conn.query(`
+      SELECT u.ID, u.user_login, u.user_email, u.user_registered
+      FROM \`${userTable}\` u
+      LEFT JOIN user_onboarding_states s ON u.ID = s.wp_user_id
+      WHERE s.id IS NULL
+      ORDER BY u.ID DESC
+      LIMIT 25
+    `);
+
+    if (!newUsers || newUsers.length === 0) {
+      await conn.end();
+      return { success: true, count: 0, message: 'No new registrations pending analysis.' };
+    }
+
+    console.log(`[AUTO-DETECT]: Found ${newUsers.length} new WordPress registration(s). Analyzing heuristics...`);
+    const processed = [];
+
+    for (const raw of newUsers) {
+      const wpid = raw.ID;
+      const uname = raw.user_login || `user_${wpid}`;
+      const email = raw.user_email || `${uname}@example.com`;
+
+      // Evaluate registration with Agentix AI heuristics
+      const evalRes = evaluateRegistration(uname, email);
+      const isSpamBot = evalRes.risk_score >= 0.7 || evalRes.assigned_role.includes('blocked');
+      const isProbationary = !isSpamBot && evalRes.assigned_role.includes('probationary');
+      const isTrusted = !isSpamBot && evalRes.assigned_role.includes('trusted');
+
+      let actionTaken = '';
+
+      if (isSpamBot) {
+        // 1. Bot Trap / Spam: Delete permanently from WordPress!
+        await conn.query(`DELETE FROM \`${userTable}\` WHERE ID = ?`, [wpid]);
+        if (metaTable) {
+          await conn.query(`DELETE FROM \`${metaTable}\` WHERE user_id = ?`, [wpid]);
+        }
+        await conn.query(`
+          INSERT INTO user_onboarding_states (wp_user_id, onboarding_stage, assigned_role, risk_score, evaluation_status, email_verified)
+          VALUES (?, 'escalated', 'restricted_blocked', ?, 'deleted_blocked', 0)
+          ON DUPLICATE KEY UPDATE
+            onboarding_stage = 'escalated',
+            assigned_role = 'restricted_blocked',
+            risk_score = VALUES(risk_score),
+            evaluation_status = 'deleted_blocked',
+            updated_at = NOW()
+        `, [wpid, evalRes.risk_score]);
+
+        actionTaken = 'DELETED_BLOCKED';
+
+        // Email Admin immediately
+        const adminSubject = `🚨 [BOT AUTO-BLOCKED & PURGED] New Registration: ${uname} (#${wpid})`;
+        const adminHtml = `
+          <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #ef4444; max-width:620px;">
+            <h2 style="color:#ef4444; margin-top:0;">🚨 Spam Bot Auto-Detected &amp; Purged</h2>
+            <p>Agentix AI automated surveillance detected a new registration from WordPress and identified high-risk spam bot patterns.</p>
+            <div style="background:#1a1318; border:1px solid #7f1d1d; border-radius:6px; padding:14px; margin:14px 0;">
+              <p style="margin:4px 0;"><strong>Username:</strong> ${uname}</p>
+              <p style="margin:4px 0;"><strong>WP User ID:</strong> #${wpid}</p>
+              <p style="margin:4px 0;"><strong>Email:</strong> ${email}</p>
+              <p style="margin:4px 0;"><strong>Risk Score:</strong> ${evalRes.risk_score.toFixed(2)}</p>
+              <p style="margin:4px 0;"><strong>Heuristics:</strong> ${evalRes.risk_reasons || 'Blacklisted keyword / disposable domain pattern'}</p>
+              <p style="margin:4px 0;"><strong>Action Executed:</strong> Permanently deleted from WordPress (<code>${userTable}</code> &amp; <code>${metaTable}</code>). User cannot log in.</p>
+              <p style="margin:4px 0;"><strong>Audit Trail:</strong> Recorded in <code>learnami_ttest.user_onboarding_states</code>.</p>
+            </div>
+            <p style="font-size:11px; color:#64748b;">Dispatched automatically by AppFlicks Automation Engine.</p>
+          </div>
+        `;
+
+        await sendSmtpEmail({
+          to: smtpConfig.recipient || 'test@appflicks.com',
+          subject: adminSubject,
+          html: adminHtml,
+          text: adminSubject
+        });
+
+      } else if (isProbationary) {
+        // 2. Probationary / Progressive Asks: Deactivate account in WordPress, keep password 100% intact!
+        await conn.query(`
+          UPDATE \`${userTable}\` SET user_status = 1, user_activation_key = 'DEACTIVATED_PROBATIONARY_ASKS' WHERE ID = ?
+        `, [wpid]);
+
+        if (metaTable) {
+          const prefix = userTable.replace(/users$/i, '');
+          const capKey = `${prefix}capabilities`;
+          const levelKey = `${prefix}user_level`;
+          try {
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:23:"subscriber_probationary";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:23:"subscriber_probationary";b:1;}'`,
+              [wpid, capKey]
+            );
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
+              [wpid, levelKey]
+            );
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', 'deactivated') ON DUPLICATE KEY UPDATE meta_value = 'deactivated'`,
+              [wpid]
+            );
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_post', '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
+              [wpid]
+            );
+          } catch (e) {}
+        }
+
+        await conn.query(`
+          INSERT INTO user_onboarding_states (wp_user_id, onboarding_stage, assigned_role, risk_score, evaluation_status, email_verified)
+          VALUES (?, 'progressive_asks', 'subscriber_probationary', ?, 'deactivated', 0)
+          ON DUPLICATE KEY UPDATE
+            onboarding_stage = 'progressive_asks',
+            assigned_role = 'subscriber_probationary',
+            risk_score = VALUES(risk_score),
+            evaluation_status = 'deactivated',
+            updated_at = NOW()
+        `, [wpid, evalRes.risk_score]);
+
+        actionTaken = 'DEACTIVATED_PROBATIONARY';
+
+        // Email Admin
+        const adminSubject = `⚠️ [NEW REGISTRATION DEACTIVATED] Probationary: ${uname} (#${wpid})`;
+        const adminHtml = `
+          <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #f59e0b; max-width:620px;">
+            <h2 style="color:#f59e0b; margin-top:0;">⚠️ New User Deactivated (Probationary Onboarding)</h2>
+            <p>A new registration was detected from WordPress and automatically placed under supervised probation.</p>
+            <div style="background:#1c1912; border:1px solid #78350f; border-radius:6px; padding:14px; margin:14px 0;">
+              <p style="margin:4px 0;"><strong>Username:</strong> ${uname}</p>
+              <p style="margin:4px 0;"><strong>WP User ID:</strong> #${wpid}</p>
+              <p style="margin:4px 0;"><strong>Email:</strong> ${email}</p>
+              <p style="margin:4px 0;"><strong>Assigned Role:</strong> subscriber_probationary</p>
+              <p style="margin:4px 0;"><strong>Status in WordPress:</strong> user_status=1 (deactivated), posting gated (0)</p>
+              <p style="margin:4px 0;"><strong>Password:</strong> Kept 100% intact and unchanged</p>
+            </div>
+            <p style="font-size:11px; color:#64748b;">Dispatched automatically by AppFlicks Automation Engine.</p>
+          </div>
+        `;
+
+        await sendSmtpEmail({
+          to: smtpConfig.recipient || 'test@appflicks.com',
+          subject: adminSubject,
+          html: adminHtml,
+          text: adminSubject
+        });
+
+      } else {
+        // 3. Trusted: Activate in WordPress with password intact!
+        await conn.query(`
+          UPDATE \`${userTable}\` SET user_status = 0, user_activation_key = '' WHERE ID = ?
+        `, [wpid]);
+
+        if (metaTable) {
+          const prefix = userTable.replace(/users$/i, '');
+          const capKey = `${prefix}capabilities`;
+          const levelKey = `${prefix}user_level`;
+          try {
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:10:"subscriber";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:10:"subscriber";b:1;}'`,
+              [wpid, capKey]
+            );
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
+              [wpid, levelKey]
+            );
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', 'active') ON DUPLICATE KEY UPDATE meta_value = 'active'`,
+              [wpid]
+            );
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_post', '1') ON DUPLICATE KEY UPDATE meta_value = '1'`,
+              [wpid]
+            );
+          } catch (e) {}
+        }
+
+        await conn.query(`
+          INSERT INTO user_onboarding_states (wp_user_id, onboarding_stage, assigned_role, risk_score, evaluation_status, email_verified)
+          VALUES (?, 'completed', 'subscriber_trusted', ?, 'approved', 1)
+          ON DUPLICATE KEY UPDATE
+            onboarding_stage = 'completed',
+            assigned_role = 'subscriber_trusted',
+            risk_score = VALUES(risk_score),
+            evaluation_status = 'approved',
+            updated_at = NOW()
+        `, [wpid, evalRes.risk_score]);
+
+        actionTaken = 'ACTIVATED_TRUSTED';
+
+        const adminSubject = `✓ [NEW REGISTRATION APPROVED] Trusted Member: ${uname} (#${wpid})`;
+        const adminHtml = `
+          <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #10b981; max-width:620px;">
+            <h2 style="color:#10b981; margin-top:0;">✓ New User Auto-Approved as Trusted</h2>
+            <p><strong>Username:</strong> ${uname} (#${wpid})</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Role:</strong> subscriber (Full rights active)</p>
+            <p><strong>Password:</strong> Intact and unchanged</p>
+          </div>
+        `;
+
+        await sendSmtpEmail({
+          to: smtpConfig.recipient || 'test@appflicks.com',
+          subject: adminSubject,
+          html: adminHtml,
+          text: adminSubject
+        });
+      }
+
+      processed.push({ id: wpid, username: uname, action: actionTaken });
+
+      // Add to local cohort cache
+      const existingIdx = users.findIndex(u => u.id === wpid || u.wp_user_id === wpid);
+      const userObj = {
+        id: wpid,
+        wp_user_id: wpid,
+        username: uname,
+        email: email,
+        email_verified: !isSpamBot,
+        age: null,
+        location: 'US',
+        bio: '',
+        avatar_completed: !isSpamBot,
+        assigned_role: isSpamBot ? 'restricted_blocked' : (isProbationary ? 'subscriber_probationary' : 'subscriber_trusted'),
+        onboarding_stage: isSpamBot ? 'escalated' : (isProbationary ? 'progressive_asks' : 'completed'),
+        evaluation_status: isSpamBot ? 'deleted_blocked' : (isProbationary ? 'deactivated' : 'approved'),
+        risk_score: evalRes.risk_score,
+        can_post: isTrusted,
+        can_comment: !isSpamBot,
+        can_vote: isTrusted,
+        deleted_from_wp: isSpamBot,
+        created_at: new Date().toISOString().substring(0, 16)
+      };
+
+      if (existingIdx >= 0) {
+        users[existingIdx] = userObj;
+      } else {
+        users.unshift(userObj);
+      }
+    }
+
+    fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
+    await conn.end();
+
+    return {
+      success: true,
+      count: processed.length,
+      processed,
+      message: `✓ Auto-detected and processed ${processed.length} new user(s). Admin alerts dispatched via email.`
+    };
+  } catch (err) {
+    if (conn) {
+      try { await conn.end(); } catch (e) {}
+    }
+    console.warn('[AUTO-DETECT ERROR]:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// ==========================================
 // Fast Incremental Database Automation Execution & SMTP Dispatch
-// (Updates real WordPress 8uI_users + 8uI_usermeta + user_onboarding_states!)
 // ==========================================
 async function executeDatabaseAutomationAndNotify(allUsers, forceFull = false) {
   let dbResult = { success: false, mode: 'local', count: 0, message: '' };
@@ -1114,20 +1300,14 @@ async function executeDatabaseAutomationAndNotify(allUsers, forceFull = false) {
   const probCount = allUsers.filter(u => u.assigned_role.includes('probationary')).length;
   const blockedCount = allUsers.filter(u => u.assigned_role.includes('blocked')).length;
 
-  // Filter to only changed users unless forceFull is requested
+  // Keep sync extremely fast: only sync modified users (or max 10 users)
   let usersToSync = [];
-  if (forceFull) {
-    usersToSync = allUsers.slice(0, 200);
-  } else if (changedUserIds.size > 0) {
-    usersToSync = allUsers.filter(u => changedUserIds.has(u.id) || changedUserIds.has(u.wp_user_id));
+  if (changedUserIds.size > 0) {
+    usersToSync = allUsers.filter(u => changedUserIds.has(u.id) || changedUserIds.has(u.wp_user_id)).slice(0, 25);
+  } else if (forceFull) {
+    usersToSync = allUsers.slice(0, 15);
   } else {
-    // Sync all blocked users to ensure real WordPress lockouts are active, plus recent users
-    const blockedUsers = allUsers.filter(u => u.assigned_role.includes('blocked')).slice(0, 50);
-    const recentUsers = allUsers.slice(0, 20);
-    const combinedMap = new Map();
-    blockedUsers.forEach(u => combinedMap.set(u.wp_user_id || u.id, u));
-    recentUsers.forEach(u => combinedMap.set(u.wp_user_id || u.id, u));
-    usersToSync = Array.from(combinedMap.values());
+    usersToSync = allUsers.slice(0, 5);
   }
 
   if (!dbConfig.USER || !dbConfig.PASSWORD) {
@@ -1736,12 +1916,10 @@ app.post('/onboarding/', async (req, res) => {
       syncRes = await attemptRealMysqlSync(dbConfig);
     }
 
-    if (!syncRes || !syncRes.success || users.length < 4000) {
-      users = generateWordPressCohort(4000);
-      fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
-      res.locals.messages = [{ tags: 'success', text: `✓ Synchronized 4,000 WordPress users cohort (3,198 trusted, 401 probationary, 401 blocked).` }];
+    if (syncRes && syncRes.success) {
+      res.locals.messages = [{ tags: 'success', text: `✓ Synchronized ${users.length} real WordPress user(s) directly from live MySQL table '${syncRes.user_table}'!` }];
     } else {
-      res.locals.messages = [{ tags: 'success', text: `✓ Synchronized ${users.length} users directly from live MySQL table '${syncRes.user_table}'!` }];
+      res.locals.messages = [{ tags: 'warning', text: `⚠️ Database sync status: ${syncRes ? syncRes.message : 'Please configure your MySQL password in Database Setup to sync live records.'} (Found ${users.length} stored user records).` }];
     }
   } else if (action === 'run_onboarding_batch') {
     // Fast Delta sync to MySQL & email report to test@appflicks.com
@@ -1854,6 +2032,112 @@ app.post('/onboarding/', async (req, res) => {
       res.locals.messages = [{
         tags: 'danger',
         text: `🗑️ User #${user.wp_user_id} (${user.username}) permanently deleted from WordPress! Database: ${dbSync.message} ${emailStatusMsg}`
+      }];
+    }
+  } else if (action === 'bulk_update_users') {
+    const rawIds = req.body['user_ids[]'] || req.body.user_ids || req.body.selected_user_ids;
+    const bulkAction = req.body.bulk_action; // 'bulk_block_delete', 'bulk_deactivate', 'bulk_activate'
+    
+    let targetIds = [];
+    if (Array.isArray(rawIds)) {
+      targetIds = rawIds.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+    } else if (typeof rawIds === 'string' && rawIds.trim()) {
+      targetIds = [parseInt(rawIds, 10)].filter(id => !isNaN(id));
+    }
+
+    if (targetIds.length === 0) {
+      res.locals.messages = [{ tags: 'warning', text: '⚠️ No users selected. Check the boxes next to the users you want to update.' }];
+    } else {
+      let updatedCount = 0;
+      let newRole = 'subscriber_probationary';
+      let actionLabel = '';
+
+      if (bulkAction === 'bulk_block_delete') {
+        newRole = 'restricted_blocked';
+        actionLabel = 'Blocked & Purged from WordPress';
+      } else if (bulkAction === 'bulk_deactivate') {
+        newRole = 'subscriber_probationary';
+        actionLabel = 'Deactivated (Probationary, password intact)';
+      } else if (bulkAction === 'bulk_activate') {
+        newRole = 'subscriber_trusted';
+        actionLabel = 'Activated (Trusted, password intact)';
+      }
+
+      for (const uid of targetIds) {
+        const user = users.find(u => u.id === uid || u.wp_user_id === uid);
+        if (user) {
+          user.assigned_role = newRole;
+          if (newRole.includes('blocked')) {
+            user.evaluation_status = 'deleted_blocked';
+            user.onboarding_stage = 'escalated';
+            user.can_post = false;
+            user.can_comment = false;
+            user.deleted_from_wp = true;
+          } else if (newRole.includes('probationary')) {
+            user.evaluation_status = 'deactivated';
+            user.onboarding_stage = 'progressive_asks';
+            user.can_post = false;
+            user.can_comment = false;
+          } else {
+            user.evaluation_status = 'approved';
+            user.onboarding_stage = 'completed';
+            user.can_post = true;
+            user.can_comment = true;
+          }
+
+          // Sync this single record directly to MySQL
+          await syncSingleUserToDatabase(user);
+          updatedCount++;
+        }
+      }
+
+      fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
+
+      // Dispatch summary alert email to Admin
+      const adminSubject = `⚡ [BULK ACTION PROCESSED] ${updatedCount} User(s) ${actionLabel}`;
+      const adminHtml = `
+        <div style="font-family:'Segoe UI',sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #6366f1; max-width:620px;">
+          <h2 style="color:#6366f1; margin-top:0;">⚡ Bulk Governance Action Executed</h2>
+          <div style="background:#1a1d27; border:1px solid #2d3348; border-radius:6px; padding:14px; margin:14px 0;">
+            <p style="margin:4px 0;"><strong>Action:</strong> ${actionLabel}</p>
+            <p style="margin:4px 0;"><strong>Total Accounts Updated:</strong> ${updatedCount}</p>
+            <p style="margin:4px 0;"><strong>Affected IDs:</strong> #${targetIds.slice(0, 30).join(', #')}${targetIds.length > 30 ? '...' : ''}</p>
+            <p style="margin:4px 0;"><strong>Database:</strong> Synced to live WordPress &amp; <code>user_onboarding_states</code>.</p>
+          </div>
+          <p style="font-size:11px; color:#64748b;">Dispatched automatically by AppFlicks Automation Engine.</p>
+        </div>
+      `;
+
+      await sendSmtpEmail({
+        to: smtpConfig.recipient || 'test@appflicks.com',
+        subject: adminSubject,
+        html: adminHtml,
+        text: adminSubject
+      });
+
+      res.locals.messages = [{
+        tags: 'success',
+        text: `✓ Bulk action complete: ${updatedCount} user(s) were successfully ${actionLabel}. Admin alert email sent.`
+      }];
+    }
+  } else if (action === 'detect_new_users') {
+    const detectRes = await detectAndProcessNewRegistrations();
+    if (detectRes.success) {
+      if (detectRes.count > 0) {
+        res.locals.messages = [{
+          tags: 'success',
+          text: `✓ Auto-detection complete! Processed ${detectRes.count} new user(s). Security actions applied and email alerts dispatched to admin.`
+        }];
+      } else {
+        res.locals.messages = [{
+          tags: 'info',
+          text: '✓ All users are up to date! No unanalyzed new registrations found in WordPress.'
+        }];
+      }
+    } else {
+      res.locals.messages = [{
+        tags: 'warning',
+        text: `Auto-detection notice: ${detectRes.reason || detectRes.error || 'Check MySQL settings in Database Setup.'}`
       }];
     }
   } else if (action === 'send_user_email') {
@@ -2715,11 +2999,25 @@ app.post('/api/retrieval/query/', (req, res) => {
   res.json(retrieveMatches(query, limit));
 });
 
+app.post('/api/onboarding/detect-new-users/', async (req, res) => {
+  const result = await detectAndProcessNewRegistrations();
+  res.json(result);
+});
+
 // Start Express Server
 app.listen(PORT, HOST, async () => {
   console.log(`⚡ Learnami Automation Engine running at http://${HOST}:${PORT}`);
   if (dbConfig.USER && dbConfig.PASSWORD) {
     console.log(`Attempting initial MySQL connection to ${dbConfig.HOST}...`);
     await attemptRealMysqlSync(dbConfig);
+    // Initial auto-detection scan on boot
+    detectAndProcessNewRegistrations().catch(err => console.warn('[BOOT AUTO-DETECT]:', err.message));
   }
+
+  // Periodic surveillance: auto-detect new registrations every 3 minutes
+  setInterval(() => {
+    if (dbConfig.USER && dbConfig.PASSWORD) {
+      detectAndProcessNewRegistrations().catch(err => console.warn('[BACKGROUND AUTO-DETECT]:', err.message));
+    }
+  }, 3 * 60 * 1000);
 });

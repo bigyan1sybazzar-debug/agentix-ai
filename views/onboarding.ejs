@@ -26,9 +26,9 @@
 <div class="stats-row four-col" style="margin-bottom:1.5rem;">
   <a href="/onboarding/?role=all&limit=<%= typeof pageSize !== 'undefined' ? pageSize : 50 %>" class="stat-box clickable <%= (typeof roleFilter === 'undefined' || roleFilter === 'all') ? 'active-filter' : '' %>" title="Click to view all users">
     <span class="click-indicator">Click to View All ›</span>
-    <div class="stat-label">Total WordPress Users</div>
+    <div class="stat-label">Total Real Users</div>
     <div class="stat-value"><%= total_users %></div>
-    <div class="stat-sub"><%= total_users >= 4000 ? '4,000 cohort synchronized' : 'Starter demo set' %></div>
+    <div class="stat-sub">Live WordPress Database</div>
   </a>
 
   <a href="/onboarding/?role=trusted&limit=<%= typeof pageSize !== 'undefined' ? pageSize : 50 %>" class="stat-box clickable <%= (typeof roleFilter !== 'undefined' && roleFilter === 'trusted') ? 'active-filter' : '' %>" title="Click to filter trusted subscribers">
@@ -48,7 +48,7 @@
   <a href="/onboarding/?role=blocked&limit=<%= typeof pageSize !== 'undefined' ? pageSize : 50 %>" class="stat-box clickable <%= (typeof roleFilter !== 'undefined' && roleFilter === 'blocked') ? 'active-filter' : '' %>" title="Click to filter blocked users">
     <span class="click-indicator">Filter ›</span>
     <div class="stat-label">Blocked / Bot Traps</div>
-    <div class="stat-value" style="color:#ef4444;"><%= typeof blocked !== 'undefined' ? blocked : 401 %></div>
+    <div class="stat-value" style="color:#ef4444;"><%= typeof blocked !== 'undefined' ? blocked : 0 %></div>
     <div class="stat-sub">Spam patterns &amp; fake emails</div>
   </a>
 </div>
@@ -81,16 +81,35 @@
       </form>
     </div>
 
+    <!-- Auto-Detect & Analyze New Registrations Card -->
+    <div class="card" style="background:linear-gradient(135deg, rgba(30,27,75,0.8), rgba(15,23,42,0.9)); border:1px solid #6366f1; margin-bottom:1.25rem;">
+      <div class="card-title" style="color:#a5b4fc; font-size:0.85rem; display:flex; align-items:center; gap:0.4rem;">
+        <span>⚡ Auto-Detect New Registrations</span>
+      </div>
+      <p style="font-size:0.75rem; color:var(--muted); margin-bottom:0.75rem; line-height:1.4;">
+        Scans WordPress for new sign-ups, evaluates heuristics, executes policy (purges bots, deactivates probationary, activates trusted), and emails admin.
+      </p>
+      <form method="post" style="margin-bottom:0.4rem;">
+        <input type="hidden" name="action" value="detect_new_users">
+        <button type="submit" class="btn btn-primary btn-full btn-sm" style="background:#4f46e5; border-color:#6366f1;">
+          🔍 Auto-Detect &amp; Notify Admin
+        </button>
+      </form>
+      <div style="font-size:0.68rem; color:#94a3b8; text-align:center;">
+        ⚡ Background surveillance active (auto-polls every 3 mins)
+      </div>
+    </div>
+
     <!-- Live Database & SMTP Automation Sync Card -->
     <div class="card" style="background:rgba(26,29,39,0.9); border:1px solid var(--border);">
-      <div class="card-title" style="color:#fff; font-size:0.85rem;">⚡ Database Automation &amp; SMTP</div>
+      <div class="card-title" style="color:#fff; font-size:0.85rem;">⚡ Manual Database Sync &amp; SMTP</div>
       <p style="font-size:0.75rem; color:var(--muted); margin-bottom:0.75rem;">
-        Executing the onboarding batch writes updates directly into your MySQL database table <code>user_onboarding_states</code> and emails the full report to <code>test@appflicks.com</code>.
+        Syncs onboarding updates directly into your MySQL database table <code>user_onboarding_states</code> and emails report to <code>test@appflicks.com</code>.
       </p>
       <form method="post" style="margin-bottom:0.5rem;">
         <input type="hidden" name="action" value="run_onboarding_batch">
-        <button type="submit" class="btn btn-primary btn-full btn-sm">
-          ⚡ Run Batch &amp; Email Report
+        <button type="submit" class="btn btn-secondary btn-full btn-sm">
+          ⚡ Fast Delta Sync &amp; Report
         </button>
       </form>
       <a href="/smtp-settings/" class="btn btn-secondary btn-full btn-sm" style="text-align:center;">
@@ -131,7 +150,7 @@
           <option value="100" <%= (typeof pageSize !== 'undefined' && pageSize === 100) ? 'selected' : '' %>>100 / page</option>
           <option value="250" <%= (typeof pageSize !== 'undefined' && pageSize === 250) ? 'selected' : '' %>>250 / page</option>
           <option value="500" <%= (typeof pageSize !== 'undefined' && pageSize === 500) ? 'selected' : '' %>>500 / page</option>
-          <option value="all" <%= (typeof pageSize !== 'undefined' && pageSize >= 4000) ? 'selected' : '' %>>All (4000)</option>
+          <option value="all" <%= (typeof pageSize !== 'undefined' && pageSize >= 1000) ? 'selected' : '' %>>All Users</option>
         </select>
 
         <button type="submit" class="btn btn-secondary btn-sm" style="padding:4px 8px;">Search</button>
@@ -140,7 +159,7 @@
           <a href="/onboarding/?role=all" class="btn btn-secondary btn-sm" title="Clear all filters">Reset</a>
         <% } %>
 
-        <% if (typeof pageSize === 'undefined' || pageSize < 4000) { %>
+        <% if (typeof pageSize === 'undefined' || pageSize < 1000) { %>
           <a href="/onboarding/?role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&limit=all" class="btn btn-secondary btn-sm" style="border-color:var(--accent); color:#a5b4fc;" title="View all users in one screen">
             👁️ View All
           </a>
@@ -149,89 +168,108 @@
     </div>
 
     <% if (users && users.length > 0) { %>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>WP ID</th>
-            <th>User</th>
-            <th>Risk</th>
-            <th>Stage</th>
-            <th>Role</th>
-            <th>Post?</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% users.forEach(function(u) { %>
-          <tr class="clickable-row" onclick="inspectUserRow(<%= u.id %>)" id="user-row-<%= u.id %>">
-            <td style="font-family:monospace; font-size:0.75rem; color:var(--muted);">#<%= u.wp_user_id %></td>
-            <td>
-              <div style="display:flex; align-items:center; gap:0.4rem;">
-                <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:<%= u.assigned_role.includes('trusted') ? '#10b981' : (u.assigned_role.includes('blocked') ? '#ef4444' : '#f59e0b') %>;"></span>
-                <strong style="color:#fff;"><%= u.username %></strong>
-              </div>
-              <div style="font-size:0.72rem; color:var(--muted); margin-left:14px;"><%= u.email %></div>
-            </td>
-            <td>
-              <span class="badge badge-<%= u.risk_score > 0.5 ? 'red' : (u.risk_score > 0.2 ? 'amber' : 'green') %>">
-                <%= Number(u.risk_score).toFixed(2) %>
-              </span>
-            </td>
-            <td>
-              <span class="badge badge-blue" style="font-size:0.7rem;"><%= u.onboarding_stage %></span>
-            </td>
-            <td style="font-size:0.78rem;">
-              <span style="color:<%= u.assigned_role.includes('trusted') ? '#10b981' : (u.assigned_role.includes('blocked') ? '#ef4444' : '#f59e0b') %>; font-weight:600;">
-                <%= u.assigned_role %>
-              </span>
-            </td>
-            <td>
-              <% if (u.can_post) { %>
-                <span class="badge badge-green">Yes</span>
-              <% } else { %>
-                <span class="badge badge-red">No</span>
-              <% } %>
-            </td>
-            <td onclick="event.stopPropagation()">
-              <div style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
-                <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.7rem;" onclick="inspectUserRow(<%= u.id %>)">
-                  👁️ Inspect
-                </button>
-                <% if (!u.assigned_role.includes('blocked')) { %>
-                  <form method="post" style="margin:0; display:inline;">
-                    <input type="hidden" name="action" value="update_user_role">
-                    <input type="hidden" name="user_id" value="<%= u.id %>">
-                    <input type="hidden" name="new_role" value="restricted_blocked">
-                    <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 6px; font-size:0.68rem;" title="Block & permanently delete from WordPress (8uI_users & usermeta) and email user + admin">🚫 Block &amp; Delete</button>
-                  </form>
+    <form method="post" id="bulkActionsForm">
+      <input type="hidden" name="action" value="bulk_update_users">
+
+      <!-- Bulk Selection & Action Toolbar -->
+      <div id="bulkActionsToolbar" style="background:rgba(20,24,36,0.85); border:1px solid #3b82f6; border-radius:6px; padding:8px 12px; margin-bottom:0.75rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <label style="font-size:0.78rem; color:#fff; display:flex; align-items:center; gap:0.4rem; cursor:pointer; margin:0;">
+            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllUsers(this)" style="cursor:pointer;">
+            <strong>Select All on Page</strong>
+          </label>
+          <span style="font-size:0.75rem; color:#93c5fd; font-weight:600;">
+            (<span id="bulkSelectedCount">0</span> selected)
+          </span>
+        </div>
+        <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+          <button type="submit" name="bulk_action" value="bulk_block_delete" class="btn btn-danger btn-sm" style="padding:3px 8px; font-size:0.72rem;" onclick="return confirm('Permanently delete all selected users from WordPress (8uI_users & 8uI_usermeta)?')">
+            🚫 Bulk Block &amp; Delete from WP
+          </button>
+          <button type="submit" name="bulk_action" value="bulk_deactivate" class="btn btn-secondary btn-sm" style="padding:3px 8px; font-size:0.72rem; color:#f59e0b; border-color:rgba(245,158,11,0.4);" onclick="return confirm('Deactivate all selected accounts in WordPress (user_status=1, password intact)?')">
+            ⏳ Bulk Deactivate (Probationary)
+          </button>
+          <button type="submit" name="bulk_action" value="bulk_activate" class="btn btn-secondary btn-sm" style="padding:3px 8px; font-size:0.72rem; color:#10b981; border-color:rgba(16,185,129,0.4);" onclick="return confirm('Activate all selected accounts in WordPress (user_status=0, password intact)?')">
+            ✓ Bulk Activate (Trusted)
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:34px; text-align:center;">
+                <input type="checkbox" id="headerCheckbox" onchange="toggleSelectAllUsers(this)" style="cursor:pointer;" title="Select / Deselect All">
+              </th>
+              <th>WP ID</th>
+              <th>User</th>
+              <th>Risk</th>
+              <th>Stage</th>
+              <th>Role</th>
+              <th>Post?</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach(function(u) { %>
+            <tr class="clickable-row" onclick="inspectUserRow(<%= u.id %>)" id="user-row-<%= u.id %>">
+              <td onclick="event.stopPropagation()" style="text-align:center;">
+                <input type="checkbox" name="user_ids[]" value="<%= u.id %>" class="user-select-chk" onchange="updateBulkCounter()" style="cursor:pointer;">
+              </td>
+              <td style="font-family:monospace; font-size:0.75rem; color:var(--muted);">#<%= u.wp_user_id %></td>
+              <td>
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:<%= u.assigned_role.includes('trusted') ? '#10b981' : (u.assigned_role.includes('blocked') ? '#ef4444' : '#f59e0b') %>;"></span>
+                  <strong style="color:#fff;"><%= u.username %></strong>
+                </div>
+                <div style="font-size:0.72rem; color:var(--muted); margin-left:14px;"><%= u.email %></div>
+              </td>
+              <td>
+                <span class="badge badge-<%= u.risk_score > 0.5 ? 'red' : (u.risk_score > 0.2 ? 'amber' : 'green') %>">
+                  <%= Number(u.risk_score).toFixed(2) %>
+                </span>
+              </td>
+              <td>
+                <span class="badge badge-blue" style="font-size:0.7rem;"><%= u.onboarding_stage %></span>
+              </td>
+              <td style="font-size:0.78rem;">
+                <span style="color:<%= u.assigned_role.includes('trusted') ? '#10b981' : (u.assigned_role.includes('blocked') ? '#ef4444' : '#f59e0b') %>; font-weight:600;">
+                  <%= u.assigned_role %>
+                </span>
+              </td>
+              <td>
+                <% if (u.can_post) { %>
+                  <span class="badge badge-green">Yes</span>
+                <% } else { %>
+                  <span class="badge badge-red">No</span>
                 <% } %>
-                <% if (!u.assigned_role.includes('probationary')) { %>
-                  <form method="post" style="margin:0; display:inline;">
-                    <input type="hidden" name="action" value="update_user_role">
-                    <input type="hidden" name="user_id" value="<%= u.id %>">
-                    <input type="hidden" name="new_role" value="subscriber_probationary">
-                    <button type="submit" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#f59e0b; border-color:rgba(245,158,11,0.3);" title="Deactivate account in WordPress (user_status=1, password intact) and email user + admin">⏳ Deactivate</button>
-                  </form>
-                <% } %>
-                <% if (u.assigned_role.includes('blocked') || u.assigned_role.includes('probationary')) { %>
-                  <form method="post" style="margin:0; display:inline;">
-                    <input type="hidden" name="action" value="update_user_role">
-                    <input type="hidden" name="user_id" value="<%= u.id %>">
-                    <input type="hidden" name="new_role" value="subscriber_trusted">
-                    <button type="submit" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#10b981; border-color:rgba(16,185,129,0.3);" title="Activate account in WordPress (user_status=0, password intact) and email user + admin">✓ Activate</button>
-                  </form>
-                <% } %>
-              </div>
-            </td>
-          </tr>
-          <% }); %>
-        </tbody>
-      </table>
-    </div>
+              </td>
+              <td onclick="event.stopPropagation()">
+                <div style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
+                  <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.7rem;" onclick="inspectUserRow(<%= u.id %>)">
+                    👁️ Inspect
+                  </button>
+                  <% if (!u.assigned_role.includes('blocked')) { %>
+                    <button type="button" class="btn btn-danger btn-sm" style="padding:2px 6px; font-size:0.68rem;" onclick="submitSingleAction(<%= u.id %>, 'update_user_role', 'restricted_blocked')" title="Block & permanently delete from WordPress (8uI_users & usermeta) and email user + admin">🚫 Block &amp; Delete</button>
+                  <% } %>
+                  <% if (!u.assigned_role.includes('probationary')) { %>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#f59e0b; border-color:rgba(245,158,11,0.3);" onclick="submitSingleAction(<%= u.id %>, 'update_user_role', 'subscriber_probationary')" title="Deactivate account in WordPress (user_status=1, password intact) and email user + admin">⏳ Deactivate</button>
+                  <% } %>
+                  <% if (u.assigned_role.includes('blocked') || u.assigned_role.includes('probationary')) { %>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#10b981; border-color:rgba(16,185,129,0.3);" onclick="submitSingleAction(<%= u.id %>, 'update_user_role', 'subscriber_trusted')" title="Activate account in WordPress (user_status=0, password intact) and email user + admin">✓ Activate</button>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </form>
 
     <!-- Pagination Controls (only shown if not viewing all) -->
-    <% if (typeof totalPages !== 'undefined' && totalPages > 1 && (typeof pageSize === 'undefined' || pageSize < 4000)) { %>
+    <% if (typeof totalPages !== 'undefined' && totalPages > 1 && (typeof pageSize === 'undefined' || pageSize < 1000)) { %>
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border);">
         <div style="font-size:0.78rem; color:var(--muted);">
           Showing <%= ((currentPage - 1) * pageSize) + 1 %> - <%= Math.min(currentPage * pageSize, totalFiltered) %> of <%= totalFiltered %> users
@@ -252,7 +290,7 @@
           <% } %>
 
           <a href="?role=<%= typeof roleFilter !== 'undefined' ? roleFilter : 'all' %>&limit=all" class="btn btn-primary btn-sm" style="margin-left:0.5rem;">
-            👁️ View All (4,000)
+            👁️ View All
           </a>
         </div>
       </div>
@@ -264,7 +302,7 @@
       <br><br>
       <form method="post" style="display:inline;">
         <input type="hidden" name="action" value="sync_wp_users">
-        <button type="submit" class="btn btn-primary btn-sm">📥 Ingest 4,000 WordPress Users</button>
+        <button type="submit" class="btn btn-primary btn-sm">⚡ Sync Real Users from MySQL Database</button>
       </form>
     </div>
     <% } %>
@@ -528,6 +566,51 @@ function closeUserModal(e) {
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeUserModal();
 });
+
+function toggleSelectAllUsers(master) {
+  const checkboxes = document.querySelectorAll('.user-select-chk');
+  checkboxes.forEach(cb => cb.checked = master.checked);
+  const headerCb = document.getElementById('headerCheckbox');
+  const barCb = document.getElementById('selectAllCheckbox');
+  if (headerCb) headerCb.checked = master.checked;
+  if (barCb) barCb.checked = master.checked;
+  updateBulkCounter();
+}
+
+function updateBulkCounter() {
+  const selected = document.querySelectorAll('.user-select-chk:checked').length;
+  const countEl = document.getElementById('bulkSelectedCount');
+  if (countEl) countEl.innerText = selected;
+}
+
+function submitSingleAction(userId, actionName, newRole) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/onboarding/';
+
+  const actInp = document.createElement('input');
+  actInp.type = 'hidden';
+  actInp.name = 'action';
+  actInp.value = actionName;
+  form.appendChild(actInp);
+
+  const idInp = document.createElement('input');
+  idInp.type = 'hidden';
+  idInp.name = 'user_id';
+  idInp.value = userId;
+  form.appendChild(idInp);
+
+  if (newRole) {
+    const roleInp = document.createElement('input');
+    roleInp.type = 'hidden';
+    roleInp.name = 'new_role';
+    roleInp.value = newRole;
+    form.appendChild(roleInp);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+}
 </script>
 
 <%- include('footer') %>
