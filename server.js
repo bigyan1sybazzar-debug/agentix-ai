@@ -206,20 +206,20 @@ async function notifyAdminAndUserOnRoleChange({ user, oldRole, newRole, reason }
   let adminHtml = '';
 
   if (isBlocked) {
-    userSubject = `🚫 Important Security Notice: Your AppFlicks Account is Blocked`;
+    userSubject = `🚫 Important Security Notice: Your AppFlicks Account Has Been Deleted & Terminated`;
     userHtml = `
       <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #ef4444; max-width:620px;">
-        <h2 style="color:#ef4444; margin-top:0;">🚫 Important Account Notice</h2>
+        <h2 style="color:#ef4444; margin-top:0;">🚫 Account Deleted &amp; Terminated</h2>
         <p>Dear <strong>${user.username}</strong>,</p>
-        <p>Your account on AppFlicks has been placed on <strong>Restricted / Blocked</strong> status due to community policy safeguards or risk detection.</p>
+        <p>Your account on AppFlicks (ID #${user.wp_user_id}) has been <strong>permanently closed and removed</strong> from our active WordPress directory pursuant to community safety rules or anti-bot screening.</p>
         <div style="background:#1a1318; border:1px solid #7f1d1d; border-radius:6px; padding:14px; margin:16px 0;">
           <p style="margin:4px 0;"><strong>Account:</strong> ${user.username} (ID #${user.wp_user_id})</p>
-          <p style="margin:4px 0;"><strong>Reason:</strong> ${reason || 'Community policy enforcement / anti-spam screening'}</p>
-          <p style="margin:4px 0;"><strong>Status:</strong> Blocked (Posting &amp; Commenting Paused)</p>
-          <p style="margin:4px 0;"><strong>Your Password:</strong> Kept intact and unchanged</p>
+          <p style="margin:4px 0;"><strong>Action Taken:</strong> Account deleted and purged from WordPress</p>
+          <p style="margin:4px 0;"><strong>Reason:</strong> ${reason || 'Bot trap safeguard / policy violation'}</p>
+          <p style="margin:4px 0;"><strong>Login Status:</strong> Terminated (Record purged)</p>
         </div>
         <p style="color:#94a3b8; font-size:13px;">
-          If you believe this was in error, you may file an appeal by replying to this notice or reaching out to <a href="mailto:${adminEmail}" style="color:#6366f1;">${adminEmail}</a>.
+          If you believe this deletion was in error, you may file an appeal by replying to this notice or reaching out to <a href="mailto:${adminEmail}" style="color:#6366f1;">${adminEmail}</a>.
         </p>
         <p style="font-size:11px; color:#64748b; margin-top:20px;">
           Learnami Automated Agent Governance Engine &bull; AppFlicks
@@ -227,36 +227,38 @@ async function notifyAdminAndUserOnRoleChange({ user, oldRole, newRole, reason }
       </div>
     `;
 
-    adminSubject = `🚨 [SECURITY AUDIT] User Blocked: ${user.username} (#${user.wp_user_id})`;
+    adminSubject = `🚨 [ACCOUNT DELETED & BLOCKED] User ${user.username} (#${user.wp_user_id})`;
     adminHtml = `
       <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #ef4444; max-width:620px;">
-        <h2 style="color:#ef4444; margin-top:0;">🚨 User Account Blocked by Admin / Automation</h2>
+        <h2 style="color:#ef4444; margin-top:0;">🚨 User Account Deleted &amp; Blocked (Bot Trap Policy)</h2>
         <div style="background:#1a1318; border:1px solid #7f1d1d; border-radius:6px; padding:14px; margin:16px 0;">
           <p style="margin:4px 0;"><strong>Username:</strong> ${user.username}</p>
           <p style="margin:4px 0;"><strong>WP User ID:</strong> #${user.wp_user_id}</p>
           <p style="margin:4px 0;"><strong>User Email:</strong> ${userEmail}</p>
           <p style="margin:4px 0;"><strong>Assigned Role:</strong> restricted_blocked</p>
-          <p style="margin:4px 0;"><strong>Reason:</strong> ${reason || 'Administrative action'}</p>
-          <p style="margin:4px 0;"><strong>WordPress Status:</strong> user_status=1, capabilities=restricted_blocked (password intact)</p>
+          <p style="margin:4px 0;"><strong>Action Taken:</strong> Permanently deleted from WordPress tables (<code>8uI_users</code> &amp; <code>8uI_usermeta</code>)</p>
+          <p style="margin:4px 0;"><strong>Reason:</strong> ${reason || 'Bot trap pattern / policy enforcement'}</p>
+          <p style="margin:4px 0;"><strong>Audit Trail:</strong> Preserved in <code>learnami_ttest.user_onboarding_states</code> (status: deleted_blocked)</p>
+          <p style="margin:4px 0;"><strong>Login Prevention:</strong> Account purged; user cannot log in (prevents password mismatch errors and unwanted WP password reset notifications).</p>
         </div>
         <p style="font-size:11px; color:#64748b;">Dispatched automatically by AppFlicks Automation Engine.</p>
       </div>
     `;
   } else if (isProbationary) {
-    userSubject = `⚠️ Notice: Your AppFlicks Account is on Supervised Probation`;
+    userSubject = `⚠️ Action Required: Your AppFlicks Account is Deactivated (Probationary)`;
     userHtml = `
       <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #f59e0b; max-width:620px;">
-        <h2 style="color:#f59e0b; margin-top:0;">⚠️ Account Status: Probationary</h2>
+        <h2 style="color:#f59e0b; margin-top:0;">⚠️ Account Deactivated (Supervised Probation)</h2>
         <p>Dear <strong>${user.username}</strong>,</p>
-        <p>Your account is active on <strong>Probationary Status</strong> under supervised release.</p>
+        <p>Your account on AppFlicks (ID #${user.wp_user_id}) is currently <strong>Deactivated</strong> under supervised probation while onboarding verification is completed.</p>
         <div style="background:#1c1912; border:1px solid #78350f; border-radius:6px; padding:14px; margin:16px 0;">
           <p style="margin:4px 0;"><strong>Account:</strong> ${user.username} (ID #${user.wp_user_id})</p>
-          <p style="margin:4px 0;"><strong>Login Status:</strong> Enabled (Log in with your normal password)</p>
-          <p style="margin:4px 0;"><strong>Allowed Permissions:</strong> Commenting &amp; Reading</p>
-          <p style="margin:4px 0;"><strong>Restricted Permissions:</strong> Creating new main posts/topics is temporarily gated</p>
+          <p style="margin:4px 0;"><strong>Status:</strong> Deactivated (user_status=1)</p>
+          <p style="margin:4px 0;"><strong>Posting / Commenting:</strong> Temporarily paused (0)</p>
+          <p style="margin:4px 0;"><strong>Password:</strong> Safely preserved and intact (unchanged)</p>
         </div>
         <p style="color:#94a3b8; font-size:13px;">
-          Complete 3 successful community interactions and profile setup to unlock full trusted contributor privileges.
+          To reactivate full member privileges, please complete your onboarding profile asks and email verification.
         </p>
         <p style="font-size:11px; color:#64748b; margin-top:20px;">
           Learnami Automated Agent Governance Engine &bull; AppFlicks
@@ -264,17 +266,20 @@ async function notifyAdminAndUserOnRoleChange({ user, oldRole, newRole, reason }
       </div>
     `;
 
-    adminSubject = `⚠️ [AUDIT] User Set to Probationary: ${user.username} (#${user.wp_user_id})`;
+    adminSubject = `⚠️ [ACCOUNT DEACTIVATED] User Set to Probationary: ${user.username} (#${user.wp_user_id})`;
     adminHtml = `
       <div style="font-family:'Segoe UI',system-ui,sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #f59e0b; max-width:620px;">
-        <h2 style="color:#f59e0b; margin-top:0;">⚠️ User Set to Probationary</h2>
+        <h2 style="color:#f59e0b; margin-top:0;">⚠️ User Account Deactivated (Probationary Status)</h2>
         <div style="background:#1c1912; border:1px solid #78350f; border-radius:6px; padding:14px; margin:16px 0;">
           <p style="margin:4px 0;"><strong>Username:</strong> ${user.username}</p>
           <p style="margin:4px 0;"><strong>User ID:</strong> #${user.wp_user_id}</p>
           <p style="margin:4px 0;"><strong>User Email:</strong> ${userEmail}</p>
-          <p style="margin:4px 0;"><strong>Assigned Role:</strong> subscriber_probationary</p>
-          <p style="margin:4px 0;"><strong>Permissions:</strong> can_comment=1, can_post=0</p>
+          <p style="margin:4px 0;"><strong>WordPress Status:</strong> user_status=1 (deactivated), capabilities=subscriber_probationary</p>
+          <p style="margin:4px 0;"><strong>Permissions:</strong> can_comment=0, can_post=0</p>
+          <p style="margin:4px 0;"><strong>Password:</strong> Kept 100% intact and unchanged (no WP password email triggered)</p>
+          <p style="margin:4px 0;"><strong>Reason:</strong> ${reason || 'Onboarding progressive asks pending'}</p>
         </div>
+        <p style="font-size:11px; color:#64748b;">Dispatched automatically by AppFlicks Automation Engine.</p>
       </div>
     `;
   } else if (isTrusted) {
@@ -826,7 +831,7 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
   const uid = user.wp_user_id || user.id;
   const uname = user.username;
   const uemail = user.email;
-  const isBlocked = user.assigned_role.includes('blocked') || user.evaluation_status === 'rejected' || (user.risk_score >= 0.7);
+  const isBlocked = user.assigned_role.includes('blocked') || user.evaluation_status === 'rejected' || user.evaluation_status === 'deleted_blocked' || (user.risk_score >= 0.7);
   const isTrusted = user.assigned_role.includes('trusted');
   const isProbationary = user.assigned_role.includes('probationary');
 
@@ -839,52 +844,55 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
   let updatedWp = false;
   let loginAction = 'unchanged';
 
+  if (isBlocked) {
+    // =========================================================================
+    // 1. BLOCKED / BOT TRAPS: PERMANENTLY DELETE ACCOUNT FROM WORDPRESS TABLES
+    // =========================================================================
+    // Blocked accounts and spam bots are deleted completely from 8uI_users & usermeta so:
+    // - User cannot log in (WordPress returns unknown user, never password error)
+    // - WordPress will never trigger "User changed password" emails to admin
+    // - Bot accounts do not pollute WordPress database
+    const targetId = existing.length > 0 ? existing[0].ID : uid;
+
+    await conn.query(`DELETE FROM \`${userTable}\` WHERE ID = ?`, [targetId]);
+    if (metaTable) {
+      await conn.query(`DELETE FROM \`${metaTable}\` WHERE user_id = ?`, [targetId]);
+    }
+
+    loginAction = 'DELETED_FROM_WP (permanently purged from WordPress users and usermeta)';
+    updatedWp = true;
+    return { success: true, updatedWp, loginAction, deleted: true };
+  }
+
   if (existing.length > 0) {
     const row = existing[0];
     const actualId = row.ID;
 
-    // Check if the user's password was previously corrupted by $BLOCKED_ and restore it
-    let restorePassSql = '';
-    let restoredPass = null;
-
-    if (row.user_pass && row.user_pass.startsWith('$BLOCKED_')) {
-      if (metaTable) {
-        try {
-          const [saved] = await conn.query(
-            `SELECT meta_value FROM \`${metaTable}\` WHERE user_id = ? AND meta_key = '_agentix_saved_pass' LIMIT 1`,
-            [actualId]
-          );
-          if (saved.length > 0 && saved[0].meta_value) {
-            restoredPass = saved[0].meta_value;
-            restorePassSql = ', user_pass = ?';
-          }
-        } catch (e) {}
-      }
-    }
-
-    if (isBlocked) {
-      // 1. Mark user_status = 1 (WordPress deactivated / restricted marker)
-      // 2. Mark user_activation_key = 'BLOCKED_BY_AGENTIX_AI'
-      // 3. PRESERVE password intact - do NOT change or corrupt user_pass!
-      const updateParams = [1, 'BLOCKED_BY_AGENTIX_AI'];
-      if (restorePassSql && restoredPass) {
-        updateParams.push(restoredPass);
-      }
-      updateParams.push(actualId);
-
+    if (isProbationary) {
+      // =========================================================================
+      // 2. PROBATIONARY / ASKS: DEACTIVATE ACCOUNT (PASSWORD KEPT 100% INTACT)
+      // =========================================================================
+      // - user_status = 1 (deactivated / inactive marker in WordPress)
+      // - user_activation_key = 'DEACTIVATED_PROBATIONARY_ASKS'
+      // - CRITICAL: Never touch or overwrite user_pass! Password remains intact!
       await conn.query(
-        `UPDATE \`${userTable}\` SET user_status = ?, user_activation_key = ? ${restorePassSql} WHERE ID = ?`,
-        updateParams
+        `UPDATE \`${userTable}\` SET user_status = 1, user_activation_key = 'DEACTIVATED_PROBATIONARY_ASKS' WHERE ID = ?`,
+        [actualId]
       );
 
-      // Update WordPress capabilities in usermeta to restricted_blocked
+      // Update WordPress capabilities in usermeta to subscriber_probationary
       if (metaTable) {
         const prefix = userTable.replace(/users$/i, '');
         const capKey = `${prefix}capabilities`;
         const levelKey = `${prefix}user_level`;
         try {
+          // Remove any stray _agentix_saved_pass
           await conn.query(
-            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:18:"restricted_blocked";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:18:"restricted_blocked";b:1;}'`,
+            `DELETE FROM \`${metaTable}\` WHERE user_id = ? AND meta_key = '_agentix_saved_pass'`,
+            [actualId]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:23:"subscriber_probationary";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:23:"subscriber_probationary";b:1;}'`,
             [actualId, capKey]
           );
           await conn.query(
@@ -892,7 +900,7 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
             [actualId, levelKey]
           );
           await conn.query(
-            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', 'blocked') ON DUPLICATE KEY UPDATE meta_value = 'blocked'`,
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', 'deactivated') ON DUPLICATE KEY UPDATE meta_value = 'deactivated'`,
             [actualId]
           );
           await conn.query(
@@ -906,69 +914,19 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
         } catch (e) {}
       }
 
-      loginAction = 'BLOCKED (user_status=1, role=restricted_blocked, password intact)';
+      loginAction = 'DEACTIVATED_PROBATIONARY (user_status=1, role=subscriber_probationary, can_post=0, password intact)';
       updatedWp = true;
-    } else if (isProbationary) {
-      // User is PROBATIONARY:
-      // 1. Set user_status = 0 (Active login permitted!)
-      // 2. Clear activation key
-      // 3. Keep real password intact
-      const updateParams = [0, ''];
-      if (restorePassSql && restoredPass) {
-        updateParams.push(restoredPass);
-      }
-      updateParams.push(actualId);
 
-      await conn.query(
-        `UPDATE \`${userTable}\` SET user_status = ?, user_activation_key = ? ${restorePassSql} WHERE ID = ?`,
-        updateParams
-      );
-
-      // Update usermeta capabilities to subscriber_probationary
-      if (metaTable) {
-        const prefix = userTable.replace(/users$/i, '');
-        const capKey = `${prefix}capabilities`;
-        const levelKey = `${prefix}user_level`;
-        try {
-          await conn.query(
-            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:23:"subscriber_probationary";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:23:"subscriber_probationary";b:1;}'`,
-            [actualId, capKey]
-          );
-          await conn.query(
-            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
-            [actualId, levelKey]
-          );
-          await conn.query(
-            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', 'probationary') ON DUPLICATE KEY UPDATE meta_value = 'probationary'`,
-            [actualId]
-          );
-          await conn.query(
-            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_post', '0') ON DUPLICATE KEY UPDATE meta_value = '0'`,
-            [actualId]
-          );
-          await conn.query(
-            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_comment', '1') ON DUPLICATE KEY UPDATE meta_value = '1'`,
-            [actualId]
-          );
-        } catch (e) {}
-      }
-
-      loginAction = 'PROBATIONARY (user_status=0, role=subscriber_probationary, can_comment=1, can_post=0, password intact)';
-      updatedWp = true;
     } else if (isTrusted) {
-      // User is TRUSTED:
-      // 1. Set user_status = 0 (Active)
-      // 2. Clear activation key
-      // 3. Full subscriber role capabilities
-      const updateParams = [0, ''];
-      if (restorePassSql && restoredPass) {
-        updateParams.push(restoredPass);
-      }
-      updateParams.push(actualId);
-
+      // =========================================================================
+      // 3. TRUSTED: ACTIVATE ACCOUNT (PASSWORD KEPT 100% INTACT)
+      // =========================================================================
+      // - user_status = 0 (Active in WordPress)
+      // - user_activation_key = '' (Cleared)
+      // - CRITICAL: Never touch or overwrite user_pass!
       await conn.query(
-        `UPDATE \`${userTable}\` SET user_status = ?, user_activation_key = ? ${restorePassSql} WHERE ID = ?`,
-        updateParams
+        `UPDATE \`${userTable}\` SET user_status = 0, user_activation_key = '' WHERE ID = ?`,
+        [actualId]
       );
 
       // Update usermeta capabilities to subscriber
@@ -977,6 +935,10 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
         const capKey = `${prefix}capabilities`;
         const levelKey = `${prefix}user_level`;
         try {
+          await conn.query(
+            `DELETE FROM \`${metaTable}\` WHERE user_id = ? AND meta_key = '_agentix_saved_pass'`,
+            [actualId]
+          );
           await conn.query(
             `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:10:"subscriber";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:10:"subscriber";b:1;}'`,
             [actualId, capKey]
@@ -1000,55 +962,63 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
         } catch (e) {}
       }
 
-      loginAction = 'TRUSTED (user_status=0, role=subscriber, full permissions, password intact)';
+      loginAction = 'ACTIVATED_TRUSTED (user_status=0, role=subscriber, full permissions, password intact)';
       updatedWp = true;
     }
+
   } else {
-    // Brand new user from registration: INSERT into real WordPress tables without corrupting password!
-    const passHash = '$P$B' + Buffer.from(uname + 'learnami').toString('base64').substring(0, 20);
-    const initialStatus = isBlocked ? 1 : 0;
-    const initialKey = isBlocked ? 'BLOCKED_BY_AGENTIX_AI' : '';
+    // User does not exist in WordPress userTable
+    if (isBlocked) {
+      // Do NOT insert blocked user into WordPress!
+      loginAction = 'SKIPPED_BLOCKED (not inserted into WordPress)';
+      updatedWp = false;
+    } else {
+      // Brand new user from registration: INSERT into real WordPress tables
+      const passHash = '$P$B' + Buffer.from(uname + 'learnami').toString('base64').substring(0, 20);
+      const initialStatus = isProbationary ? 1 : 0;
+      const initialKey = isProbationary ? 'DEACTIVATED_PROBATIONARY_ASKS' : '';
 
-    await conn.query(
-      `INSERT INTO \`${userTable}\` (ID, user_login, user_pass, user_nicename, user_email, user_url, user_registered, user_activation_key, user_status, display_name)
-       VALUES (?, ?, ?, ?, ?, '', NOW(), ?, ?, ?)`,
-      [
-        uid,
-        uname,
-        passHash,
-        uname,
-        uemail,
-        initialKey,
-        initialStatus,
-        uname
-      ]
-    );
+      await conn.query(
+        `INSERT INTO \`${userTable}\` (ID, user_login, user_pass, user_nicename, user_email, user_url, user_registered, user_activation_key, user_status, display_name)
+         VALUES (?, ?, ?, ?, ?, '', NOW(), ?, ?, ?)`,
+        [
+          uid,
+          uname,
+          passHash,
+          uname,
+          uemail,
+          initialKey,
+          initialStatus,
+          uname
+        ]
+      );
 
-    if (metaTable) {
-      const prefix = userTable.replace(/users$/i, '');
-      const capKey = `${prefix}capabilities`;
-      const levelKey = `${prefix}user_level`;
-      const roleCap = isBlocked
-        ? 'a:1:{s:18:"restricted_blocked";b:1;}'
-        : (isProbationary ? 'a:1:{s:23:"subscriber_probationary";b:1;}' : 'a:1:{s:10:"subscriber";b:1;}');
-      try {
-        await conn.query(
-          `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, ?)`,
-          [uid, capKey, roleCap]
-        );
-        await conn.query(
-          `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0')`,
-          [uid, levelKey]
-        );
-        await conn.query(
-          `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', ?)`,
-          [uid, isBlocked ? 'blocked' : (isProbationary ? 'probationary' : 'active')]
-        );
-      } catch (e) {}
+      if (metaTable) {
+        const prefix = userTable.replace(/users$/i, '');
+        const capKey = `${prefix}capabilities`;
+        const levelKey = `${prefix}user_level`;
+        const roleCap = isProbationary
+          ? 'a:1:{s:23:"subscriber_probationary";b:1;}'
+          : 'a:1:{s:10:"subscriber";b:1;}';
+        try {
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, ?)`,
+            [uid, capKey, roleCap]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0')`,
+            [uid, levelKey]
+          );
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', ?)`,
+            [uid, isProbationary ? 'deactivated' : 'active']
+          );
+        } catch (e) {}
+      }
+
+      loginAction = isProbationary ? 'INSERTED_DEACTIVATED_PROBATIONARY' : 'INSERTED_ACTIVE_TRUSTED';
+      updatedWp = true;
     }
-
-    loginAction = isBlocked ? 'INSERTED_BLOCKED' : (isProbationary ? 'INSERTED_PROBATIONARY' : 'INSERTED_ACTIVE');
-    updatedWp = true;
   }
 
   return { success: true, updatedWp, loginAction };
@@ -1805,16 +1775,17 @@ app.post('/onboarding/', async (req, res) => {
         user.can_vote = true;
       } else if (newRole.includes('probationary')) {
         user.onboarding_stage = 'progressive_asks';
-        user.evaluation_status = 'approved';
-        user.can_post = false;
-        user.can_comment = true;
-        user.can_vote = false;
-      } else if (newRole.includes('blocked')) {
-        user.onboarding_stage = 'escalated';
-        user.evaluation_status = 'rejected';
+        user.evaluation_status = 'deactivated';
         user.can_post = false;
         user.can_comment = false;
         user.can_vote = false;
+      } else if (newRole.includes('blocked')) {
+        user.onboarding_stage = 'escalated';
+        user.evaluation_status = 'deleted_blocked';
+        user.can_post = false;
+        user.can_comment = false;
+        user.can_vote = false;
+        user.deleted_from_wp = true;
       }
       fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
 
@@ -1843,6 +1814,46 @@ app.post('/onboarding/', async (req, res) => {
       res.locals.messages = [{
         tags: 'success',
         text: `✓ User #${user.wp_user_id} (${user.username}) updated to '${newRole}'. Database: ${dbSync.message} ${emailStatusMsg}`
+      }];
+    }
+  } else if (action === 'delete_user') {
+    const uid = parseInt(req.body.user_id, 10);
+    const user = users.find(u => u.id === uid || u.wp_user_id === uid);
+    const deleteReason = req.body.reason || 'Bot trap pattern / policy enforcement';
+    if (user) {
+      const oldRole = user.assigned_role;
+      user.assigned_role = 'restricted_blocked';
+      user.evaluation_status = 'deleted_blocked';
+      user.onboarding_stage = 'escalated';
+      user.can_post = false;
+      user.can_comment = false;
+      user.can_vote = false;
+      user.deleted_from_wp = true;
+      fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
+
+      // Purge from WordPress 8uI_users & 8uI_usermeta
+      const dbSync = await syncSingleUserToDatabase(user);
+
+      // Send termination emails to both user and admin
+      const notifyResult = await notifyAdminAndUserOnRoleChange({
+        user,
+        oldRole,
+        newRole: 'restricted_blocked',
+        reason: deleteReason
+      });
+
+      let emailStatusMsg = '';
+      if (notifyResult.userEmailRes.sent && notifyResult.adminEmailRes.sent) {
+        emailStatusMsg = `✓ Notification emails delivered to both user (${user.email}) and admin (${smtpConfig.recipient}).`;
+      } else if (notifyResult.adminEmailRes.sent) {
+        emailStatusMsg = `✓ Notification emailed to admin (${smtpConfig.recipient}); user notice queued.`;
+      } else {
+        emailStatusMsg = `✉ Notice logged in Outbox for user (${user.email}) and admin (${smtpConfig.recipient}).`;
+      }
+
+      res.locals.messages = [{
+        tags: 'danger',
+        text: `🗑️ User #${user.wp_user_id} (${user.username}) permanently deleted from WordPress! Database: ${dbSync.message} ${emailStatusMsg}`
       }];
     }
   } else if (action === 'send_user_email') {

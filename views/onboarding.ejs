@@ -203,7 +203,7 @@
                     <input type="hidden" name="action" value="update_user_role">
                     <input type="hidden" name="user_id" value="<%= u.id %>">
                     <input type="hidden" name="new_role" value="restricted_blocked">
-                    <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 6px; font-size:0.68rem;" title="Block account (password intact) & email user + admin">🚫 Block</button>
+                    <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 6px; font-size:0.68rem;" title="Block & permanently delete from WordPress (8uI_users & usermeta) and email user + admin">🚫 Block &amp; Delete</button>
                   </form>
                 <% } %>
                 <% if (!u.assigned_role.includes('probationary')) { %>
@@ -211,7 +211,7 @@
                     <input type="hidden" name="action" value="update_user_role">
                     <input type="hidden" name="user_id" value="<%= u.id %>">
                     <input type="hidden" name="new_role" value="subscriber_probationary">
-                    <button type="submit" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#f59e0b; border-color:rgba(245,158,11,0.3);" title="Set probationary (password intact) & email user + admin">⏳ Prohibit</button>
+                    <button type="submit" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#f59e0b; border-color:rgba(245,158,11,0.3);" title="Deactivate account in WordPress (user_status=1, password intact) and email user + admin">⏳ Deactivate</button>
                   </form>
                 <% } %>
                 <% if (u.assigned_role.includes('blocked') || u.assigned_role.includes('probationary')) { %>
@@ -219,7 +219,7 @@
                     <input type="hidden" name="action" value="update_user_role">
                     <input type="hidden" name="user_id" value="<%= u.id %>">
                     <input type="hidden" name="new_role" value="subscriber_trusted">
-                    <button type="submit" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#10b981; border-color:rgba(16,185,129,0.3);" title="Approve trusted (password intact) & email user + admin">✓ Trust</button>
+                    <button type="submit" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#10b981; border-color:rgba(16,185,129,0.3);" title="Activate account in WordPress (user_status=0, password intact) and email user + admin">✓ Activate</button>
                   </form>
                 <% } %>
               </div>
@@ -404,23 +404,39 @@
         <input type="hidden" name="user_id" id="modal-input-user-id" value="">
 
         <div style="font-size:0.75rem; font-weight:600; color:#fff; margin-bottom:0.4rem;">
-          Change Governance Role &amp; Sync to WordPress (<code style="color:#10b981;">8uI_users &amp; usermeta</code>):
+          Governance Actions &amp; WordPress Synchronization (<code style="color:#10b981;">8uI_users &amp; usermeta</code>):
         </div>
-        <div style="font-size:0.72rem; color:var(--muted); margin-bottom:0.5rem;">
-          Role updates sync directly to WordPress (<code>user_status</code> &amp; <code>usermeta</code>). Real password is kept intact (no password corruption). <strong>Dispatches notification emails to BOTH the user and admin.</strong>
+        <div style="font-size:0.72rem; color:var(--muted); margin-bottom:0.6rem; line-height:1.4;">
+          &bull; <strong>Block &amp; Delete:</strong> Permanently deletes account from WordPress (<code>8uI_users</code> &amp; <code>usermeta</code>). User cannot log in, eliminating password errors and unwanted password change alerts. Logs audit record.<br>
+          &bull; <strong>Deactivate (Probationary):</strong> Marks account deactivated (<code>user_status=1</code>) with password kept 100% intact.<br>
+          &bull; <strong>Activate (Trusted):</strong> Sets active status (<code>user_status=0</code>) with full posting rights.
         </div>
-        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.75rem;">
           <button type="submit" name="new_role" value="subscriber_trusted" class="btn btn-secondary btn-sm" style="color:#10b981; border-color:rgba(16,185,129,0.3);">
-            ✓ Set Trusted (Email User + Admin)
+            ✓ Activate Account (Trusted)
           </button>
           <button type="submit" name="new_role" value="subscriber_probationary" class="btn btn-secondary btn-sm" style="color:#f59e0b; border-color:rgba(245,158,11,0.3);">
-            ⏳ Set Probationary (Email User + Admin)
+            ⏳ Deactivate Account (Probationary)
           </button>
-          <button type="submit" name="new_role" value="restricted_blocked" class="btn btn-danger btn-sm">
-            🚫 Block Account (Password Intact &bull; Email User + Admin)
+          <button type="submit" name="new_role" value="restricted_blocked" class="btn btn-danger btn-sm" title="Permanently delete from WordPress and email notice">
+            🚫 Block &amp; Delete from WP
           </button>
         </div>
       </form>
+
+      <!-- Explicit Delete & Purge Form -->
+      <div style="padding-top:0.75rem; border-top:1px solid var(--border); margin-bottom:1rem;">
+        <form method="post" action="/onboarding/" onsubmit="return confirm('Permanently delete this user from WordPress (8uI_users & 8uI_usermeta)?')">
+          <input type="hidden" name="action" value="delete_user">
+          <input type="hidden" name="user_id" id="modal-delete-user-id" value="">
+          <div style="display:flex; gap:0.4rem; align-items:center;">
+            <input type="text" name="reason" placeholder="Optional reason: Bot trap / spam pattern..." class="form-control" style="font-size:0.75rem;">
+            <button type="submit" class="btn btn-danger btn-sm" style="white-space:nowrap;">
+              🗑️ Purge Account from WP
+            </button>
+          </div>
+        </form>
+      </div>
 
       <!-- Quick Email Notification via SMTP -->
       <div style="padding-top:0.85rem; border-top:1px solid var(--border);">
@@ -492,6 +508,9 @@ function inspectUserRow(userId) {
   // Set form inputs
   document.getElementById('modal-input-user-id').value = user.id;
   document.getElementById('modal-email-target-id').value = user.id;
+  if (document.getElementById('modal-delete-user-id')) {
+    document.getElementById('modal-delete-user-id').value = user.id;
+  }
 
   // Open modal
   const modal = document.getElementById('user-inspector-modal');
