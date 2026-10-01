@@ -471,34 +471,87 @@ let snapshots = [
   { id: 5, module_name: 'Media Assistant', module_key: 'media_assistant', snapshot_date: new Date().toISOString().substring(0, 10), active_users: 1, new_content_count: mediaCandidates.length, flagged_count: 1, avg_quality_score: 0.92 }
 ];
 
+const TRUSTED_DOMAINS = new Set([
+  'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.uk', 'yahoo.ca',
+  'hotmail.com', 'outlook.com', 'live.com', 'msn.com',
+  'icloud.com', 'me.com', 'mac.com',
+  'aol.com', 'zoho.com', 'proton.me', 'protonmail.com',
+  'appflicks.com', 'learnami.com'
+]);
+
 // Heuristics
 const DISPOSABLE_DOMAINS = new Set([
   'mailinator.com', 'guerrillamail.com', 'sharklasers.com',
   'tempmail.com', 'yopmail.com', '10minutemail.com', 'dispostable.com',
   'thinhmin.com', 'code-gmail.com', 'chahcyrans.com', 'dmxs8.com', 'setxko.com',
   'theking.id', 'problemno.shop', 'skachat-na-android.com', 'igurant1.online',
-  'phanmembanhang24h.com'
+  'phanmembanhang24h.com', 'ruutukf.com', 'fakemail.net', 'throwawaymail.com',
+  'mohmal.com', 'trashmail.com', 'temp-mail.org', 'crazymailing.com'
 ]);
 
-const HIGH_RISK_TLDS = ['.shop', '.store', '.online', '.id', '.ru', '.top', '.xyz', '.site', '.win', '.club', '.icu', '.best'];
+const HIGH_RISK_TLDS = ['.shop', '.store', '.online', '.id', '.ru', '.top', '.xyz', '.site', '.win', '.club', '.icu', '.best', '.buzz', '.monster'];
 
 const SPAM_PATTERNS = [
   'casino', 'crypto', 'viagra', 'seo', 'backlink', 'bot', '1win', '1xbet', '888starz',
   'aviator', 'payout', 'blockchain', 'btc', 'withdraw', 'free-btc', 'skachat', 'problemno'
 ];
 
-function evaluateRegistration(username, email) {
-  let risk_score = 0.0;
-  const reasons = [];
+// Helper: Check if string has bot / gibberish characteristics
+function isGibberishBotString(str) {
+  if (!str || typeof str !== 'string') return false;
+  const s = str.trim().toLowerCase();
+  if (s.length < 5) return false;
+
+  // Pattern 1: Digits interleaved inside random letters (e.g. goc6ie2znn, x8k2m9p, ab12cd34)
+  const interleavedDigits = /[a-z]+[0-9]+[a-z]+/i.test(s) || /[0-9]+[a-z]+[0-9]+/i.test(s);
+  
+  // Pattern 2: High consonant clustering (4 or more consecutive consonants, unpronounceable)
+  const consonantClusters = /[^aeiou0-9_]{4,}/i.test(s);
+
+  // Pattern 3: Random hex / hash string (e.g., md5 or random 8-16 char bot token)
+  const hexBotToken = /^[a-f0-9]{8,32}$/i.test(s) && /[0-9]/.test(s) && /[a-f]/.test(s);
+
+  // Pattern 4: Exactly matches random alphanumeric generator length (8 to 12 chars with letters and digits)
+  const alphanumericJumble = s.length >= 8 && s.length <= 14 && /^[a-z0-9]+$/i.test(s) && (s.match(/\d/g) || []).length >= 2 && (s.match(/[a-z]/ig) || []).length >= 4;
+
+  return interleavedDigits || consonantClusters || hexBotToken || alphanumericJumble;
+}
+
+function evaluateRegistration(username, email, wpid = null) {
   const unameLower = (username || '').toLowerCase();
   const emailLower = (email || '').toLowerCase();
   const domain = emailLower.includes('@') ? emailLower.split('@')[1] : '';
+  const emailLocal = emailLower.includes('@') ? emailLower.split('@')[0] : '';
 
+  // 1. VIP / PRIMARY ADMINISTRATOR IMMUNITY (WP ID #1, ronvining, site admin)
+  if (
+    wpid === 1 ||
+    wpid === '1' ||
+    unameLower === 'ronvining' ||
+    emailLower === 'ronvining@gmail.com' ||
+    unameLower === 'admin' ||
+    unameLower === 'administrator' ||
+    (typeof smtpConfig !== 'undefined' && smtpConfig && smtpConfig.recipient && emailLower === smtpConfig.recipient.toLowerCase())
+  ) {
+    return {
+      evaluation_status: 'approved',
+      risk_score: 0.0,
+      risk_reasons: 'primary_administrator_immunity (WP ID #1 / Site Owner)',
+      onboarding_stage: 'completed',
+      assigned_role: 'administrator'
+    };
+  }
+
+  let risk_score = 0.0;
+  const reasons = [];
+
+  // 2. Known Disposable Domain check
   if (DISPOSABLE_DOMAINS.has(domain)) {
-    risk_score += 0.85;
+    risk_score += 0.90;
     reasons.push('disposable_or_spam_domain');
   }
 
+  // 3. High Risk TLDs
   for (const tld of HIGH_RISK_TLDS) {
     if (domain.endsWith(tld)) {
       risk_score += 0.60;
@@ -507,15 +560,46 @@ function evaluateRegistration(username, email) {
     }
   }
 
+  // 4. Fake Gmail or Typosquatting
   if (domain.includes('gmail') && domain !== 'gmail.com' && domain !== 'googlemail.com') {
     risk_score += 0.90;
     reasons.push('fake_gmail_domain');
   }
 
+  // 5. Spam keywords
   for (const pattern of SPAM_PATTERNS) {
     if (unameLower.includes(pattern) || emailLower.includes(pattern)) {
       risk_score += 0.75;
       reasons.push(`spam_keyword:${pattern}`);
+    }
+  }
+
+  // 6. Gibberish Bot Pattern in Username or Email (e.g. goc6ie2znn)
+  const isUnameBot = isGibberishBotString(unameLower);
+  const isEmailLocalBot = isGibberishBotString(emailLocal);
+  const isDomainGibberish = isGibberishBotString(domain.split('.')[0]);
+
+  if (isUnameBot) {
+    risk_score += 0.55;
+    reasons.push('bot_gibberish_username_pattern');
+  }
+
+  if (isEmailLocalBot) {
+    risk_score += 0.45;
+    reasons.push('bot_gibberish_email_prefix');
+  }
+
+  // 7. Obscure / Disposable Domain with no trust history (e.g., ruutukf.com)
+  const isTrustedDomain = TRUSTED_DOMAINS.has(domain);
+  if (!isTrustedDomain) {
+    if (isDomainGibberish || (isUnameBot && unameLower === emailLocal)) {
+      // Auto-generated bot domain like ruutukf.com where user is goc6ie2znn@ruutukf.com
+      risk_score += 0.60;
+      reasons.push(`unrecognized_bot_domain:${domain}`);
+    } else {
+      // Unknown domain default policy: starts with slight caution (probationary)
+      risk_score += 0.35;
+      reasons.push(`unverified_domain:${domain}`);
     }
   }
 
@@ -588,17 +672,28 @@ async function attemptRealMysqlSync(cfg) {
           const wpid = r.ID || r.id || r.wp_user_id || (idx + 1);
           const uname = r.user_login || r.username || r.user_nicename || r.display_name || `user_${wpid}`;
           const uemail = r.user_email || r.email || `${uname}@example.com`;
-          const evalRes = evaluateRegistration(uname, uemail);
+          const evalRes = evaluateRegistration(uname, uemail, wpid);
 
-          // Check if database marks this user as blocked/locked
-          const isDbBlocked = (r.user_status && Number(r.user_status) !== 0) ||
+          // Admin Immunity check: Primary WordPress admin / site owner is NEVER blocked or penalized
+          const isAdmin = wpid === 1 ||
+            String(wpid) === '1' ||
+            uname.toLowerCase() === 'ronvining' ||
+            uemail.toLowerCase() === 'ronvining@gmail.com' ||
+            uname.toLowerCase() === 'admin' ||
+            uname.toLowerCase() === 'administrator' ||
+            (smtpConfig.recipient && uemail.toLowerCase() === smtpConfig.recipient.toLowerCase());
+
+          // Check if database marks this user as blocked/locked (Admins are immune!)
+          const isDbBlocked = !isAdmin && (
+            (r.user_status && Number(r.user_status) !== 0) ||
             (r.user_activation_key && r.user_activation_key.includes('BLOCKED')) ||
-            (r.user_pass && r.user_pass.startsWith('$BLOCKED_'));
+            (r.user_pass && r.user_pass.startsWith('$BLOCKED_'))
+          );
 
-          const assigned_role = isDbBlocked ? 'restricted_blocked' : evalRes.assigned_role;
-          const evaluation_status = isDbBlocked ? 'rejected' : evalRes.evaluation_status;
-          const onboarding_stage = isDbBlocked ? 'escalated' : evalRes.onboarding_stage;
-          const risk_score = isDbBlocked ? 0.95 : evalRes.risk_score;
+          const assigned_role = isAdmin ? 'administrator' : (isDbBlocked ? 'restricted_blocked' : evalRes.assigned_role);
+          const evaluation_status = isAdmin ? 'approved' : (isDbBlocked ? 'rejected' : evalRes.evaluation_status);
+          const onboarding_stage = isAdmin ? 'completed' : (isDbBlocked ? 'escalated' : evalRes.onboarding_stage);
+          const risk_score = isAdmin ? 0.00 : (isDbBlocked ? 0.95 : evalRes.risk_score);
 
           return {
             id: wpid,
@@ -614,8 +709,8 @@ async function attemptRealMysqlSync(cfg) {
             onboarding_stage,
             evaluation_status,
             risk_score,
-            can_post: assigned_role.includes('trusted'),
-            can_comment: !assigned_role.includes('blocked'),
+            can_post: isAdmin || assigned_role.includes('trusted'),
+            can_comment: isAdmin || !assigned_role.includes('blocked'),
             can_vote: true,
             created_at: r.user_registered ? new Date(r.user_registered).toISOString().replace('T', ' ').substring(0, 16) : new Date().toISOString().substring(0, 16)
           };
@@ -1070,7 +1165,7 @@ async function detectAndProcessNewRegistrations() {
       const email = raw.user_email || `${uname}@example.com`;
 
       // Evaluate registration with Agentix AI heuristics
-      const evalRes = evaluateRegistration(uname, email);
+      const evalRes = evaluateRegistration(uname, email, wpid);
       const isSpamBot = evalRes.risk_score >= 0.7 || evalRes.assigned_role.includes('blocked');
       const isProbationary = !isSpamBot && evalRes.assigned_role.includes('probationary');
       const isTrusted = !isSpamBot && evalRes.assigned_role.includes('trusted');
@@ -1812,7 +1907,7 @@ app.post('/api/onboarding/register/', async (req, res) => {
     return res.status(400).json({ success: false, message: 'username and email required' });
   }
 
-  const evalRes = evaluateRegistration(uname, email);
+  const evalRes = evaluateRegistration(uname, email, wpid);
   const isSpamBot = evalRes.risk_score >= 0.7 || evalRes.assigned_role.includes('blocked');
 
   const newUser = {
@@ -2351,7 +2446,7 @@ app.post('/onboarding/', async (req, res) => {
     const wpid = parseInt(req.body.wp_user_id || `${5000 + users.length + 1}`, 10);
     const uname = (req.body.username || '').trim();
     const email = (req.body.email || '').trim();
-    const evalRes = evaluateRegistration(uname, email);
+    const evalRes = evaluateRegistration(uname, email, wpid);
 
     const isSpamBot = evalRes.risk_score >= 0.7 || evalRes.assigned_role.includes('blocked');
 
