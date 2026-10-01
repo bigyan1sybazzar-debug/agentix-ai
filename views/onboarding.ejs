@@ -251,13 +251,13 @@
                     👁️ Inspect
                   </button>
                   <% if (!u.assigned_role.includes('blocked')) { %>
-                    <button type="button" class="btn btn-danger btn-sm" style="padding:2px 6px; font-size:0.68rem;" onclick="submitSingleAction(<%= u.id %>, 'update_user_role', 'restricted_blocked')" title="Block & permanently delete from WordPress (8uI_users & usermeta) and email user + admin">🚫 Block &amp; Delete</button>
+                    <button type="button" class="btn btn-danger btn-sm" style="padding:2px 6px; font-size:0.68rem;" onclick="submitSingleAction(<%= u.id %>, 'update_user_role', 'restricted_blocked', this)" title="Block & permanently delete from WordPress (8uI_users & usermeta) and email user + admin">🚫 Block &amp; Delete</button>
                   <% } %>
                   <% if (!u.assigned_role.includes('probationary')) { %>
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#f59e0b; border-color:rgba(245,158,11,0.3);" onclick="submitSingleAction(<%= u.id %>, 'update_user_role', 'subscriber_probationary')" title="Deactivate account in WordPress (user_status=1, password intact) and email user + admin">⏳ Deactivate</button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#f59e0b; border-color:rgba(245,158,11,0.3);" onclick="submitSingleAction(<%= u.id %>, 'update_user_role', 'subscriber_probationary', this)" title="Deactivate account in WordPress (user_status=1, kills sessions, password intact) and email user + admin">⏳ Deactivate</button>
                   <% } %>
                   <% if (u.assigned_role.includes('blocked') || u.assigned_role.includes('probationary')) { %>
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#10b981; border-color:rgba(16,185,129,0.3);" onclick="submitSingleAction(<%= u.id %>, 'update_user_role', 'subscriber_trusted')" title="Activate account in WordPress (user_status=0, password intact) and email user + admin">✓ Activate</button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:0.68rem; color:#10b981; border-color:rgba(16,185,129,0.3);" onclick="submitSingleAction(<%= u.id %>, 'update_user_role', 'subscriber_trusted', this)" title="Activate account in WordPress (user_status=0, password intact) and email user + admin">✓ Activate</button>
                   <% } %>
                 </div>
               </td>
@@ -583,7 +583,11 @@ function updateBulkCounter() {
   if (countEl) countEl.innerText = selected;
 }
 
-function submitSingleAction(userId, actionName, newRole) {
+function submitSingleAction(userId, actionName, newRole, btnElement) {
+  if (btnElement) {
+    btnElement.disabled = true;
+    btnElement.innerHTML = '⏳ Updating...';
+  }
   const form = document.createElement('form');
   form.method = 'POST';
   form.action = '/onboarding/';

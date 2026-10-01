@@ -106,7 +106,10 @@ function getSmtpTransporter(options = {}) {
     },
     tls: {
       rejectUnauthorized: false
-    }
+    },
+    connectionTimeout: 4000, // 4s timeout prevents request hanging
+    greetingTimeout: 4000,
+    socketTimeout: 6000
   };
 
   if (!isSecure && (port === 587 || port === 25 || port === 2525)) {
@@ -744,9 +747,10 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
     await conn.query(`DELETE FROM \`${userTable}\` WHERE ID = ?`, [targetId]);
     if (metaTable) {
       await conn.query(`DELETE FROM \`${metaTable}\` WHERE user_id = ?`, [targetId]);
+      await conn.query(`DELETE FROM \`${metaTable}\` WHERE user_id = ? AND (meta_key = 'session_tokens' OR meta_key LIKE '%session%')`, [targetId]);
     }
 
-    loginAction = 'DELETED_FROM_WP (permanently purged from WordPress users and usermeta)';
+    loginAction = 'DELETED_FROM_WP (permanently purged from WordPress users, usermeta, and active sessions killed)';
     updatedWp = true;
     return { success: true, updatedWp, loginAction, deleted: true };
   }
@@ -761,25 +765,33 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
       // =========================================================================
       // - user_status = 1 (deactivated / inactive marker in WordPress)
       // - user_activation_key = 'DEACTIVATED_PROBATIONARY_ASKS'
+      // - KILL SESSIONS: Invalidate session_tokens so user cannot stay logged in!
+      // - STRIP CAPABILITIES: a:0:{} prevents any authorized actions in WP!
       // - CRITICAL: Never touch or overwrite user_pass! Password remains intact!
       await conn.query(
         `UPDATE \`${userTable}\` SET user_status = 1, user_activation_key = 'DEACTIVATED_PROBATIONARY_ASKS' WHERE ID = ?`,
         [actualId]
       );
 
-      // Update WordPress capabilities in usermeta to subscriber_probationary
+      // Update WordPress capabilities & terminate sessions in usermeta
       if (metaTable) {
         const prefix = userTable.replace(/users$/i, '');
         const capKey = `${prefix}capabilities`;
         const levelKey = `${prefix}user_level`;
         try {
-          // Remove any stray _agentix_saved_pass
+          // 1. Destroy all active WordPress login sessions so prohibited/deactivated user is immediately logged out
           await conn.query(
-            `DELETE FROM \`${metaTable}\` WHERE user_id = ? AND meta_key = '_agentix_saved_pass'`,
+            `DELETE FROM \`${metaTable}\` WHERE user_id = ? AND (meta_key = 'session_tokens' OR meta_key LIKE '%session%')`,
             [actualId]
           );
           await conn.query(
-            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:23:"subscriber_probationary";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:23:"subscriber_probationary";b:1;}'`,
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, 'session_tokens', 'a:0:{}') ON DUPLICATE KEY UPDATE meta_value = 'a:0:{}'`,
+            [actualId]
+          );
+
+          // 2. Strip capabilities to empty array so user has 0 privileges in WordPress
+          await conn.query(
+            `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:0:{}') ON DUPLICATE KEY UPDATE meta_value = 'a:0:{}'`,
             [actualId, capKey]
           );
           await conn.query(
@@ -801,7 +813,7 @@ async function syncUserToWordPressTables(conn, user, userTable, metaTable) {
         } catch (e) {}
       }
 
-      loginAction = 'DEACTIVATED_PROBATIONARY (user_status=1, role=subscriber_probationary, can_post=0, password intact)';
+      loginAction = 'DEACTIVATED_PROBATIONARY (sessions destroyed, logged out from WP, user_status=1, capabilities cleared, password intact)';
       updatedWp = true;
 
     } else if (isTrusted) {
@@ -1121,8 +1133,18 @@ async function detectAndProcessNewRegistrations() {
           const capKey = `${prefix}capabilities`;
           const levelKey = `${prefix}user_level`;
           try {
+            // Destroy session tokens so prohibited user cannot stay logged in
             await conn.query(
-              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:23:"subscriber_probationary";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:23:"subscriber_probationary";b:1;}'`,
+              `DELETE FROM \`${metaTable}\` WHERE user_id = ? AND (meta_key = 'session_tokens' OR meta_key LIKE '%session%')`,
+              [wpid]
+            );
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, 'session_tokens', 'a:0:{}') ON DUPLICATE KEY UPDATE meta_value = 'a:0:{}'`,
+              [wpid]
+            );
+            // Strip capabilities to a:0:{}
+            await conn.query(
+              `INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:0:{}') ON DUPLICATE KEY UPDATE meta_value = 'a:0:{}'`,
               [wpid, capKey]
             );
             await conn.query(
@@ -1941,7 +1963,48 @@ app.post('/onboarding/', async (req, res) => {
   } else if (action === 'update_user_role') {
     const uid = parseInt(req.body.user_id, 10);
     const newRole = req.body.new_role;
-    const user = users.find(u => u.id === uid || u.wp_user_id === uid);
+    let user = users.find(u => u.id === uid || u.wp_user_id === uid);
+
+    // If user record is not in local array cache, load directly from WordPress database
+    if (!user && dbConfig.USER && dbConfig.PASSWORD) {
+      try {
+        const conn = await mysql.createConnection({
+          host: dbConfig.HOST,
+          port: parseInt(dbConfig.PORT || '3306', 10),
+          user: dbConfig.USER,
+          password: dbConfig.PASSWORD,
+          database: dbConfig.NAME,
+          connectTimeout: 4000
+        });
+        const [tableRows] = await conn.query('SHOW TABLES');
+        const tableNames = tableRows.map(r => Object.values(r)[0]);
+        const { userTable } = findWordPressTables(tableNames);
+        if (userTable) {
+          const [found] = await conn.query(`SELECT ID, user_login, user_email, display_name FROM \`${userTable}\` WHERE ID = ? LIMIT 1`, [uid]);
+          if (found && found.length > 0) {
+            user = {
+              id: found[0].ID,
+              wp_user_id: found[0].ID,
+              username: found[0].user_login || `user_${uid}`,
+              email: found[0].user_email || `${found[0].user_login}@example.com`,
+              assigned_role: newRole,
+              onboarding_stage: newRole.includes('trusted') ? 'completed' : (newRole.includes('blocked') ? 'escalated' : 'progressive_asks'),
+              evaluation_status: newRole.includes('trusted') ? 'approved' : (newRole.includes('blocked') ? 'deleted_blocked' : 'deactivated'),
+              risk_score: newRole.includes('blocked') ? 0.95 : 0.15,
+              can_post: newRole.includes('trusted'),
+              can_comment: !newRole.includes('blocked'),
+              can_vote: newRole.includes('trusted'),
+              created_at: new Date().toISOString().substring(0, 16)
+            };
+            users.unshift(user);
+          }
+        }
+        await conn.end();
+      } catch (err) {
+        console.warn('[USER LOOKUP WARNING]:', err.message);
+      }
+    }
+
     if (user && newRole) {
       const oldRole = user.assigned_role;
       user.assigned_role = newRole;
@@ -1967,73 +2030,59 @@ app.post('/onboarding/', async (req, res) => {
       }
       fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
 
-      // Fast single-record sync directly to live MySQL (with intact password!)
+      // Fast single-record sync directly to live MySQL (with intact password and killed sessions if prohibited)
       const dbSync = await syncSingleUserToDatabase(user);
 
-      // Dispatch notifications to BOTH user and admin!
-      const notifyResult = await notifyAdminAndUserOnRoleChange({
+      // Dispatch notifications asynchronously in background so HTTP response does NOT stall or keep loading!
+      notifyAdminAndUserOnRoleChange({
         user,
         oldRole,
         newRole,
         reason: req.body.reason || 'Admin role update in Onboarding Directory'
-      });
-
-      let emailStatusMsg = '';
-      if (notifyResult.userEmailRes.sent && notifyResult.adminEmailRes.sent) {
-        emailStatusMsg = `✓ Notification emails successfully delivered to both user (${user.email}) and admin (${smtpConfig.recipient}).`;
-      } else if (notifyResult.adminEmailRes.sent) {
-        emailStatusMsg = `✓ Notification emailed to admin (${smtpConfig.recipient}); user notice queued.`;
-      } else if (notifyResult.userEmailRes.sent) {
-        emailStatusMsg = `✓ Notification emailed to user (${user.email}); admin copy queued.`;
-      } else {
-        emailStatusMsg = `✉ Notice logged to Outbox for both user (${user.email}) and admin (${smtpConfig.recipient || 'test@appflicks.com'}). (Enter SMTP password in Settings to dispatch over live mail server)`;
-      }
+      }).catch(err => console.warn('[ASYNC EMAIL WARNING]:', err.message));
 
       res.locals.messages = [{
         tags: 'success',
-        text: `✓ User #${user.wp_user_id} (${user.username}) updated to '${newRole}'. Database: ${dbSync.message} ${emailStatusMsg}`
+        text: `✓ User #${user.wp_user_id} (${user.username}) updated to '${newRole}'. Database: ${dbSync.message} (Admin and user email notices dispatched in background).`
+      }];
+    } else {
+      res.locals.messages = [{
+        tags: 'warning',
+        text: `⚠️ User #${uid} could not be found in memory or live WordPress database. Verify the user ID.`
       }];
     }
   } else if (action === 'delete_user') {
     const uid = parseInt(req.body.user_id, 10);
-    const user = users.find(u => u.id === uid || u.wp_user_id === uid);
+    let user = users.find(u => u.id === uid || u.wp_user_id === uid);
     const deleteReason = req.body.reason || 'Bot trap pattern / policy enforcement';
-    if (user) {
-      const oldRole = user.assigned_role;
-      user.assigned_role = 'restricted_blocked';
-      user.evaluation_status = 'deleted_blocked';
-      user.onboarding_stage = 'escalated';
-      user.can_post = false;
-      user.can_comment = false;
-      user.can_vote = false;
-      user.deleted_from_wp = true;
-      fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
-
-      // Purge from WordPress 8uI_users & 8uI_usermeta
-      const dbSync = await syncSingleUserToDatabase(user);
-
-      // Send termination emails to both user and admin
-      const notifyResult = await notifyAdminAndUserOnRoleChange({
-        user,
-        oldRole,
-        newRole: 'restricted_blocked',
-        reason: deleteReason
-      });
-
-      let emailStatusMsg = '';
-      if (notifyResult.userEmailRes.sent && notifyResult.adminEmailRes.sent) {
-        emailStatusMsg = `✓ Notification emails delivered to both user (${user.email}) and admin (${smtpConfig.recipient}).`;
-      } else if (notifyResult.adminEmailRes.sent) {
-        emailStatusMsg = `✓ Notification emailed to admin (${smtpConfig.recipient}); user notice queued.`;
-      } else {
-        emailStatusMsg = `✉ Notice logged in Outbox for user (${user.email}) and admin (${smtpConfig.recipient}).`;
-      }
-
-      res.locals.messages = [{
-        tags: 'danger',
-        text: `🗑️ User #${user.wp_user_id} (${user.username}) permanently deleted from WordPress! Database: ${dbSync.message} ${emailStatusMsg}`
-      }];
+    if (!user) {
+      user = { id: uid, wp_user_id: uid, username: `user_${uid}`, email: `user_${uid}@example.com` };
     }
+    const oldRole = user.assigned_role || 'subscriber';
+    user.assigned_role = 'restricted_blocked';
+    user.evaluation_status = 'deleted_blocked';
+    user.onboarding_stage = 'escalated';
+    user.can_post = false;
+    user.can_comment = false;
+    user.can_vote = false;
+    user.deleted_from_wp = true;
+    fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
+
+    // Purge from WordPress 8uI_users & 8uI_usermeta
+    const dbSync = await syncSingleUserToDatabase(user);
+
+    // Send termination emails asynchronously
+    notifyAdminAndUserOnRoleChange({
+      user,
+      oldRole,
+      newRole: 'restricted_blocked',
+      reason: deleteReason
+    }).catch(err => console.warn('[ASYNC EMAIL WARNING]:', err.message));
+
+    res.locals.messages = [{
+      tags: 'danger',
+      text: `🗑️ User #${user.wp_user_id} (${user.username}) permanently deleted from WordPress! Database: ${dbSync.message} (Termination notices dispatched).`
+    }];
   } else if (action === 'bulk_update_users') {
     const rawIds = req.body['user_ids[]'] || req.body.user_ids || req.body.selected_user_ids;
     const bulkAction = req.body.bulk_action; // 'bulk_block_delete', 'bulk_deactivate', 'bulk_activate'
@@ -2048,7 +2097,6 @@ app.post('/onboarding/', async (req, res) => {
     if (targetIds.length === 0) {
       res.locals.messages = [{ tags: 'warning', text: '⚠️ No users selected. Check the boxes next to the users you want to update.' }];
     } else {
-      let updatedCount = 0;
       let newRole = 'subscriber_probationary';
       let actionLabel = '';
 
@@ -2057,12 +2105,101 @@ app.post('/onboarding/', async (req, res) => {
         actionLabel = 'Blocked & Purged from WordPress';
       } else if (bulkAction === 'bulk_deactivate') {
         newRole = 'subscriber_probationary';
-        actionLabel = 'Deactivated (Probationary, password intact)';
+        actionLabel = 'Deactivated (Probationary, sessions destroyed, password intact)';
       } else if (bulkAction === 'bulk_activate') {
         newRole = 'subscriber_trusted';
         actionLabel = 'Activated (Trusted, password intact)';
       }
 
+      // Fast single-connection bulk database execution
+      let dbUpdated = 0;
+      if (dbConfig.USER && dbConfig.PASSWORD) {
+        try {
+          const conn = await mysql.createConnection({
+            host: dbConfig.HOST,
+            port: parseInt(dbConfig.PORT || '3306', 10),
+            user: dbConfig.USER,
+            password: dbConfig.PASSWORD,
+            database: dbConfig.NAME,
+            connectTimeout: 5000
+          });
+
+          const [tableRows] = await conn.query('SHOW TABLES');
+          const tableNames = tableRows.map(r => Object.values(r)[0]);
+          const { userTable, metaTable } = findWordPressTables(tableNames);
+          const prefix = userTable ? userTable.replace(/users$/i, '') : '8uI_';
+          const capKey = `${prefix}capabilities`;
+          const levelKey = `${prefix}user_level`;
+
+          for (const uid of targetIds) {
+            try {
+              if (bulkAction === 'bulk_block_delete') {
+                if (userTable) await conn.query(`DELETE FROM \`${userTable}\` WHERE ID = ?`, [uid]);
+                if (metaTable) {
+                  await conn.query(`DELETE FROM \`${metaTable}\` WHERE user_id = ?`, [uid]);
+                  await conn.query(`DELETE FROM \`${metaTable}\` WHERE user_id = ? AND (meta_key = 'session_tokens' OR meta_key LIKE '%session%')`, [uid]);
+                }
+              } else if (bulkAction === 'bulk_deactivate') {
+                if (userTable) {
+                  await conn.query(
+                    `UPDATE \`${userTable}\` SET user_status = 1, user_activation_key = 'DEACTIVATED_PROBATIONARY_ASKS' WHERE ID = ?`,
+                    [uid]
+                  );
+                }
+                if (metaTable) {
+                  // Destroy sessions so prohibited user cannot stay logged in!
+                  await conn.query(`DELETE FROM \`${metaTable}\` WHERE user_id = ? AND (meta_key = 'session_tokens' OR meta_key LIKE '%session%')`, [uid]);
+                  await conn.query(`INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, 'session_tokens', 'a:0:{}') ON DUPLICATE KEY UPDATE meta_value = 'a:0:{}'`, [uid]);
+                  // Strip capabilities to a:0:{}
+                  await conn.query(`INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:0:{}') ON DUPLICATE KEY UPDATE meta_value = 'a:0:{}'`, [uid, capKey]);
+                  await conn.query(`INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', 'deactivated') ON DUPLICATE KEY UPDATE meta_value = 'deactivated'`, [uid]);
+                  await conn.query(`INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_post', '0') ON DUPLICATE KEY UPDATE meta_value = '0'`, [uid]);
+                  await conn.query(`INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_comment', '0') ON DUPLICATE KEY UPDATE meta_value = '0'`, [uid]);
+                }
+              } else if (bulkAction === 'bulk_activate') {
+                if (userTable) {
+                  await conn.query(`UPDATE \`${userTable}\` SET user_status = 0, user_activation_key = '' WHERE ID = ?`, [uid]);
+                }
+                if (metaTable) {
+                  await conn.query(`INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, 'a:1:{s:10:"subscriber";b:1;}') ON DUPLICATE KEY UPDATE meta_value = 'a:1:{s:10:"subscriber";b:1;}'`, [uid, capKey]);
+                  await conn.query(`INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, ?, '0') ON DUPLICATE KEY UPDATE meta_value = '0'`, [uid, levelKey]);
+                  await conn.query(`INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_account_status', 'active') ON DUPLICATE KEY UPDATE meta_value = 'active'`, [uid]);
+                  await conn.query(`INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_post', '1') ON DUPLICATE KEY UPDATE meta_value = '1'`, [uid]);
+                  await conn.query(`INSERT INTO \`${metaTable}\` (user_id, meta_key, meta_value) VALUES (?, '_agentix_can_comment', '1') ON DUPLICATE KEY UPDATE meta_value = '1'`, [uid]);
+                }
+              }
+
+              // Update user_onboarding_states
+              await conn.query(`
+                INSERT INTO user_onboarding_states (wp_user_id, onboarding_stage, assigned_role, risk_score, evaluation_status, email_verified)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                  onboarding_stage = VALUES(onboarding_stage),
+                  assigned_role = VALUES(assigned_role),
+                  risk_score = VALUES(risk_score),
+                  evaluation_status = VALUES(evaluation_status),
+                  updated_at = NOW()
+              `, [
+                uid,
+                newRole.includes('trusted') ? 'completed' : (newRole.includes('blocked') ? 'escalated' : 'progressive_asks'),
+                newRole,
+                newRole.includes('blocked') ? 0.95 : 0.15,
+                newRole.includes('trusted') ? 'approved' : (newRole.includes('blocked') ? 'deleted_blocked' : 'deactivated'),
+                newRole.includes('trusted') ? 1 : 0
+              ]);
+              dbUpdated++;
+            } catch (singleErr) {
+              console.warn(`[BULK USER #${uid} WARNING]:`, singleErr.message);
+            }
+          }
+
+          await conn.end();
+        } catch (dbErr) {
+          console.warn('[BULK DB CONNECTION WARNING]:', dbErr.message);
+        }
+      }
+
+      // Update in-memory users cache
       for (const uid of targetIds) {
         const user = users.find(u => u.id === uid || u.wp_user_id === uid);
         if (user) {
@@ -2084,23 +2221,19 @@ app.post('/onboarding/', async (req, res) => {
             user.can_post = true;
             user.can_comment = true;
           }
-
-          // Sync this single record directly to MySQL
-          await syncSingleUserToDatabase(user);
-          updatedCount++;
         }
       }
 
       fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
 
-      // Dispatch summary alert email to Admin
-      const adminSubject = `⚡ [BULK ACTION PROCESSED] ${updatedCount} User(s) ${actionLabel}`;
+      // Dispatch summary alert email to Admin in background
+      const adminSubject = `⚡ [BULK ACTION PROCESSED] ${targetIds.length} User(s) ${actionLabel}`;
       const adminHtml = `
         <div style="font-family:'Segoe UI',sans-serif; background:#0f1117; color:#f0f2f5; padding:24px; border-radius:8px; border:1px solid #6366f1; max-width:620px;">
           <h2 style="color:#6366f1; margin-top:0;">⚡ Bulk Governance Action Executed</h2>
           <div style="background:#1a1d27; border:1px solid #2d3348; border-radius:6px; padding:14px; margin:14px 0;">
             <p style="margin:4px 0;"><strong>Action:</strong> ${actionLabel}</p>
-            <p style="margin:4px 0;"><strong>Total Accounts Updated:</strong> ${updatedCount}</p>
+            <p style="margin:4px 0;"><strong>Total Accounts Updated:</strong> ${targetIds.length} (Synced to MySQL: ${dbUpdated})</p>
             <p style="margin:4px 0;"><strong>Affected IDs:</strong> #${targetIds.slice(0, 30).join(', #')}${targetIds.length > 30 ? '...' : ''}</p>
             <p style="margin:4px 0;"><strong>Database:</strong> Synced to live WordPress &amp; <code>user_onboarding_states</code>.</p>
           </div>
@@ -2108,16 +2241,16 @@ app.post('/onboarding/', async (req, res) => {
         </div>
       `;
 
-      await sendSmtpEmail({
+      sendSmtpEmail({
         to: smtpConfig.recipient || 'test@appflicks.com',
         subject: adminSubject,
         html: adminHtml,
         text: adminSubject
-      });
+      }).catch(err => console.warn('[ASYNC BULK EMAIL WARNING]:', err.message));
 
       res.locals.messages = [{
         tags: 'success',
-        text: `✓ Bulk action complete: ${updatedCount} user(s) were successfully ${actionLabel}. Admin alert email sent.`
+        text: `✓ Bulk action complete: ${targetIds.length} user(s) were successfully ${actionLabel}. Live MySQL synced (${dbUpdated} records updated). Admin notification dispatched in background.`
       }];
     }
   } else if (action === 'detect_new_users') {
