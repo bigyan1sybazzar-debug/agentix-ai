@@ -1,84 +1,725 @@
 <%- include('header') %>
 
-<div class="header-banner" style="display:flex; justify-content:space-between; align-items:center;">
+<!-- Blueprint Top Banner -->
+<div class="header-banner" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
   <div>
-    <h2 style="margin:0; font-size:1.4rem;">🏛️ System Production Blueprint</h2>
-    <p style="margin:0.25rem 0 0 0; font-size:0.85rem; opacity:0.85;">
-      Consolidated architecture definition, deployment zones, governance core, operational core, and snapshot management.
+    <div style="display:inline-flex; align-items:center; gap:0.5rem; margin-bottom:0.25rem;">
+      <span class="badge badge-blue" style="font-weight:700; letter-spacing:0.04em;">AGENT ARCHITECTURE MASTER</span>
+      <span class="badge badge-green">v2.5.0-PROD</span>
+    </div>
+    <h1 class="page-title" style="margin:0 0 0.25rem 0; font-size:1.5rem;"><%= blueprint.metadata.title %></h1>
+    <p class="page-sub" style="margin:0; font-size:0.85rem; max-width:850px;">
+      <%= blueprint.metadata.subtitle %>. Multi-layer agent governance, registration verification, progressive onboarding, supervised release, and 10 end-to-end simulation scenarios.
     </p>
   </div>
-  <form method="POST">
-    <input type="hidden" name="snapshot_name" value="blueprint_snapshot_<%= (snapshots || []).length + 1 %>">
-    <button type="submit" class="btn btn-secondary btn-sm">📷 Take Blueprint Snapshot</button>
-  </form>
+  <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+    <form method="POST" style="margin:0;">
+      <input type="hidden" name="action" value="take_snapshot">
+      <input type="hidden" name="snapshot_name" value="agent_blueprint_snapshot_<%= (snapshots || []).length + 1 %>">
+      <button type="submit" class="btn btn-secondary btn-sm" title="Save snapshot to audit ledger">
+        📷 Snapshot Blueprint (<%= (snapshots || []).length %>)
+      </button>
+    </form>
+    <a href="#simulation-lab" class="btn btn-primary btn-sm" style="background:#6366f1;">
+      🧪 Run Simulation Lab
+    </a>
+  </div>
 </div>
 
-<div class="card" style="margin-top:1.5rem;">
-  <h3 style="margin-top:0;">5 Consolidated Architectural Blocks</h3>
-  <div class="grid grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-    <% if (blueprint && blueprint.consolidated_blocks) { %>
-      <% blueprint.consolidated_blocks.forEach(function(block) { %>
-      <div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:var(--bg-input);">
-        <h4 style="margin:0 0 0.5rem 0; color:var(--accent);"><%= block.name %></h4>
-        <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
-          <% (block.components || []).forEach(function(comp) { %>
-          <span class="badge badge-blue" style="font-size:0.75rem;"><%= comp %></span>
+<!-- Architecture Journey Stepper (Where You Are Map) -->
+<div class="card" style="padding:0.9rem 1.25rem; margin-bottom:1.5rem; background:linear-gradient(180deg, rgba(30,34,48,0.85) 0%, rgba(20,23,32,0.95) 100%); border:1px solid var(--border);">
+  <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin-bottom:0.6rem; font-weight:600;">
+    Agent Design Lifecycle Progress Map
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.6rem;">
+    <div style="padding:0.5rem 0.6rem; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:6px;">
+      <div style="font-size:0.65rem; color:#818cf8; font-weight:600;">STEP 1</div>
+      <div style="font-size:0.78rem; font-weight:600; color:#fff;">Problem Sharpened</div>
+      <div style="font-size:0.65rem; color:var(--muted);">Usability vs Governance</div>
+    </div>
+    <div style="padding:0.5rem 0.6rem; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:6px;">
+      <div style="font-size:0.65rem; color:#818cf8; font-weight:600;">STEP 2</div>
+      <div style="font-size:0.78rem; font-weight:600; color:#fff;">Spot Concepts</div>
+      <div style="font-size:0.65rem; color:var(--muted);">5 Agentic Behaviors</div>
+    </div>
+    <div style="padding:0.5rem 0.6rem; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:6px;">
+      <div style="font-size:0.65rem; color:#818cf8; font-weight:600;">STEP 3</div>
+      <div style="font-size:0.78rem; font-weight:600; color:#fff;">Specifying Concept</div>
+      <div style="font-size:0.65rem; color:var(--muted);">Registration Verification</div>
+    </div>
+    <div style="padding:0.5rem 0.6rem; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:6px;">
+      <div style="font-size:0.65rem; color:#818cf8; font-weight:600;">STEP 4</div>
+      <div style="font-size:0.78rem; font-weight:600; color:#fff;">Completing Concept</div>
+      <div style="font-size:0.65rem; color:var(--muted);">State, Actions &amp; Thresholds</div>
+    </div>
+    <div style="padding:0.5rem 0.6rem; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:6px;">
+      <div style="font-size:0.65rem; color:#818cf8; font-weight:600;">STEP 5</div>
+      <div style="font-size:0.78rem; font-weight:600; color:#fff;">Actors &amp; Reactions</div>
+      <div style="font-size:0.65rem; color:var(--muted);">Human-in-the-Loop Matrix</div>
+    </div>
+    <div style="padding:0.5rem 0.6rem; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); border-radius:6px;">
+      <div style="font-size:0.65rem; color:#34d399; font-weight:600;">STEP 6 (CURRENT)</div>
+      <div style="font-size:0.78rem; font-weight:700; color:#10b981;">10 Scenarios Live</div>
+      <div style="font-size:0.65rem; color:#a7f3d0;">Simulation Engine Ready</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tab Navigation Header -->
+<div style="display:flex; gap:0.5rem; margin-bottom:1.25rem; border-bottom:1px solid var(--border); padding-bottom:0.75rem; overflow-x:auto;">
+  <button type="button" class="btn btn-sm bp-tab-btn active" onclick="switchBpTab('problem-concepts', this)">🎯 1-4. Problem &amp; Core Concepts</button>
+  <button type="button" class="btn btn-sm bp-tab-btn" onclick="switchBpTab('catalog-reactions', this)">⚙️ 5. Concept Catalog &amp; Reactions</button>
+  <button type="button" class="btn btn-sm bp-tab-btn" onclick="switchBpTab('simulation-lab', this)">🧪 6. 10 Scenarios Simulation Lab</button>
+  <button type="button" class="btn btn-sm bp-tab-btn" onclick="switchBpTab('deployment-zones', this)">🏛️ 7. Architecture Zones &amp; Snapshots</button>
+</div>
+
+<!-- ========================================================================= -->
+<!-- TAB 1: Sections 1 to 4: Problem, Spot Concepts, Specifying, Completing   -->
+<!-- ========================================================================= -->
+<div id="tab-problem-concepts" class="bp-tab-content">
+
+  <!-- 1. Your Problem: Sharpened -->
+  <div class="card" style="margin-bottom:1.5rem; border-left:4px solid #6366f1;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+      <h3 style="margin:0; font-size:1.1rem; color:#fff;">1. Your Problem: Sharpened</h3>
+      <span class="badge badge-blue">Problem: Registration &amp; Onboarding Strain</span>
+    </div>
+
+    <div style="background:var(--bg-input); padding:0.9rem 1rem; border-radius:6px; border:1px solid var(--border); margin-bottom:1rem;">
+      <div style="font-size:0.72rem; text-transform:uppercase; font-weight:600; color:var(--muted); margin-bottom:0.25rem;">Original Bad Situation</div>
+      <p style="margin:0; color:#94a3b8; font-size:0.85rem;">
+        &bull; <%= blueprint.problem_sharpened.original_bad_situations[0] %>
+      </p>
+    </div>
+
+    <div style="background:var(--bg-input); padding:0.9rem 1rem; border-radius:6px; border:1px solid var(--border); margin-bottom:1rem;">
+      <div style="font-size:0.72rem; text-transform:uppercase; font-weight:600; color:#6366f1; margin-bottom:0.4rem;">Sharpened Bad Situations (Synthesized)</div>
+      <% blueprint.problem_sharpened.sharpened_bad_situations.forEach(function(item) { %>
+        <p style="margin:0 0 0.5rem 0; font-size:0.85rem; line-height:1.5; color:#e2e8f0;">
+          &bull; <%= item %>
+        </p>
+      <% }); %>
+      <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); font-size:0.85rem; font-weight:600; color:#10b981;">
+        ⚡ <%= blueprint.problem_sharpened.core_insight %>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Spot Your Concepts -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+      <h3 style="margin:0; font-size:1.1rem; color:#fff;">2. Spot Your Concepts</h3>
+      <span style="font-size:0.75rem; color:var(--muted);">5 Candidate Behaviors Spotted</span>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table class="data-table" style="font-size:0.8rem;">
+        <thead>
+          <tr>
+            <th style="width:30%;">Bad Situation</th>
+            <th style="width:25%;">Cause Hypothesis</th>
+            <th style="width:20%;">Activity</th>
+            <th style="width:15%;">References</th>
+            <th style="width:10%;">Concept</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% (blueprint.spot_concepts || []).forEach(function(sc) { %>
+          <tr style="<%= sc.id === 1 ? 'background:rgba(99,102,241,0.08);' : '' %>">
+            <td style="font-size:0.78rem;">
+              <%= sc.bad_situation %>
+              <% if (sc.id === 1) { %>
+                <div style="margin-top:0.35rem;"><span class="badge badge-green" style="font-size:0.65rem;">★ SELECTED TO CARRY FORWARD</span></div>
+              <% } %>
+            </td>
+            <td style="color:#94a3b8; font-size:0.76rem;"><%= sc.cause_hypothesis %></td>
+            <td style="color:#e2e8f0; font-size:0.76rem;"><%= sc.activity %></td>
+            <td style="color:#64748b; font-size:0.74rem;"><%= sc.references %></td>
+            <td>
+              <span class="badge <%= sc.id === 1 ? 'badge-blue' : 'badge-gray' %>" style="font-weight:700;">
+                <%= sc.concept %>
+              </span>
+            </td>
+          </tr>
           <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 3. Specifying Your Concept -->
+  <div class="card" style="margin-bottom:1.5rem; border-left:4px solid #10b981;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+      <div>
+        <h3 style="margin:0; font-size:1.1rem; color:#fff;">3. Specifying Your Concept</h3>
+        <div style="font-size:0.8rem; color:#10b981; font-weight:600; text-transform:uppercase; margin-top:0.2rem;">
+          Selected Concept: <%= blueprint.specified_concept.name %>
+        </div>
+      </div>
+      <span class="badge badge-green">Operational Principle</span>
+    </div>
+
+    <div style="background:var(--bg-input); padding:1rem; border-radius:6px; border:1px solid var(--border); margin-bottom:0.75rem;">
+      <div style="font-size:0.72rem; text-transform:uppercase; font-weight:600; color:var(--muted); margin-bottom:0.25rem;">Purpose &amp; What It Prevents</div>
+      <p style="margin:0; font-size:0.83rem; line-height:1.5; color:#e2e8f0;">
+        <%= blueprint.specified_concept.purpose_prevents %>
+      </p>
+    </div>
+
+    <div style="background:rgba(16,185,129,0.06); padding:1rem; border-radius:6px; border:1px solid rgba(16,185,129,0.3);">
+      <div style="font-size:0.72rem; text-transform:uppercase; font-weight:600; color:#10b981; margin-bottom:0.25rem;">Operational Principle</div>
+      <p style="margin:0; font-size:0.83rem; line-height:1.5; color:#fff; font-weight:500;">
+        "<%= blueprint.specified_concept.operational_principle %>"
+      </p>
+    </div>
+  </div>
+
+  <!-- 4. Completing Your Concept -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin:0 0 0.75rem 0; font-size:1.1rem; color:#fff;">4. Completing Your Concept (Actions, State &amp; Thresholds)</h3>
+
+    <!-- Actions Table -->
+    <div style="margin-bottom:1.25rem;">
+      <div style="font-size:0.75rem; font-weight:600; color:#818cf8; text-transform:uppercase; margin-bottom:0.4rem;">Concept Actions Matrix</div>
+      <div style="overflow-x:auto;">
+        <table class="data-table" style="font-size:0.78rem;">
+          <thead>
+            <tr>
+              <th style="width:25%;">Action</th>
+              <th style="width:40%;">What Changes When It Succeeds</th>
+              <th style="width:35%;">Why It May Be Refused</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% (blueprint.completed_concept.actions || []).forEach(function(act) { %>
+            <tr>
+              <td><code><%= act.action %></code></td>
+              <td><%= act.what_changes %></td>
+              <td style="color:#94a3b8;"><%= act.refusal_reason %></td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- State & Thresholds Table -->
+    <div style="margin-bottom:1.25rem;">
+      <div style="font-size:0.75rem; font-weight:600; color:#818cf8; text-transform:uppercase; margin-bottom:0.4rem;">State &amp; Thresholds</div>
+      <div style="overflow-x:auto;">
+        <table class="data-table" style="font-size:0.78rem;">
+          <thead>
+            <tr>
+              <th style="width:20%;">Category</th>
+              <th style="width:80%;">Details &amp; Boundary Rules</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% (blueprint.completed_concept.state || []).forEach(function(st) { %>
+            <tr>
+              <td><strong><%= st.category %></strong></td>
+              <td><%= st.details %></td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- What Changed Synthesis -->
+    <div style="background:rgba(99,102,241,0.08); padding:0.9rem 1rem; border-radius:6px; border:1px solid rgba(99,102,241,0.25);">
+      <div style="font-size:0.72rem; text-transform:uppercase; font-weight:600; color:#818cf8; margin-bottom:0.25rem;">Simulation Synthesis &amp; What Changed</div>
+      <p style="margin:0 0 0.5rem 0; font-size:0.8rem; color:#cbd5e1; line-height:1.5;">
+        <%= blueprint.completed_concept.what_changed %>
+      </p>
+      <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem;">
+        <span class="badge badge-green" style="font-size:0.7rem;">✓ 15-min Confirmation Window</span>
+        <span class="badge badge-green" style="font-size:0.7rem;">✓ Post-Acceptance Credential Setup</span>
+        <span class="badge badge-green" style="font-size:0.7rem;">✓ Post-Rejection Appeal &amp; Redirect</span>
+        <span class="badge badge-green" style="font-size:0.7rem;">✓ Age Thresholds: AppFlicks (13+), Voters for Truth (18+ &amp; USA)</span>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ========================================================================= -->
+<!-- TAB 2: Section 5: Concept Catalog, Actors, & Reactions Matrix             -->
+<!-- ========================================================================= -->
+<div id="tab-catalog-reactions" class="bp-tab-content" style="display:none;">
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin:0 0 0.5rem 0; font-size:1.1rem; color:#fff;">5. Concept Catalog</h3>
+    <p style="font-size:0.8rem; color:var(--muted); margin-bottom:1.25rem;">
+      Full formal specification of the three core concepts orchestrating the Learnami automation pipeline.
+    </p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+      <% (blueprint.concept_catalog || []).forEach(function(c, cIdx) { %>
+      <div style="border:1px solid var(--border); border-radius:8px; padding:1.1rem; background:var(--bg-input);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+          <h4 style="margin:0; font-size:0.95rem; color:#fff;"><%= c.name %></h4>
+          <span class="badge badge-blue">Concept <%= cIdx + 1 %></span>
+        </div>
+        <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.75rem; line-height:1.4;">
+          <strong>Purpose / Prevents:</strong> <%= c.purpose_prevents %>
+        </div>
+        <div style="font-size:0.7rem; color:var(--muted); margin-bottom:0.75rem; line-height:1.4; background:rgba(0,0,0,0.25); padding:0.5rem; border-radius:4px;">
+          <strong>State:</strong> <%= c.state_summary %>
+        </div>
+        <div>
+          <div style="font-size:0.72rem; font-weight:600; color:#818cf8; text-transform:uppercase; margin-bottom:0.35rem;">Actions (<%= c.actions.length %>)</div>
+          <div style="display:flex; flex-direction:column; gap:0.3rem;">
+            <% c.actions.forEach(function(act) { %>
+            <div style="font-size:0.74rem; color:#cbd5e1; background:rgba(255,255,255,0.03); padding:0.3rem 0.5rem; border-radius:4px;">
+              <code><%= act.name %></code> &mdash; <%= act.desc %>
+            </div>
+            <% }); %>
+          </div>
         </div>
       </div>
       <% }); %>
+    </div>
+
+    <!-- Actors & Human-in-the-Loop Matrix -->
+    <div style="margin-bottom:1.5rem;">
+      <h4 style="margin:0 0 0.5rem 0; font-size:0.95rem; color:#fff;">Actors &amp; Human-in-the-Loop Matrix</h4>
+      <div style="overflow-x:auto;">
+        <table class="data-table" style="font-size:0.78rem;">
+          <thead>
+            <tr>
+              <th>Concept</th>
+              <th>Action</th>
+              <th>Actor</th>
+              <th>Human-in-the-loop</th>
+              <th>Relevant Concept</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% (blueprint.actors_matrix || []).forEach(function(row) { %>
+            <tr>
+              <td><%= row.concept %></td>
+              <td><code><%= row.action %></code></td>
+              <td>
+                <span class="badge <%= row.actor.includes('agent') ? 'badge-blue' : (row.actor.includes('person') ? 'badge-gray' : 'badge-green') %>">
+                  <%= row.actor %>
+                </span>
+              </td>
+              <td>
+                <% if (row.hitl === 'Auditing') { %>
+                  <span class="badge badge-amber" style="font-weight:700;">AUDITING REQUIRED</span>
+                <% } else { %>
+                  <span style="color:var(--muted);"><%= row.hitl %></span>
+                <% } %>
+              </td>
+              <td style="color:#94a3b8;"><%= row.relevant_concept %></td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Reactions Matrix -->
+    <div>
+      <h4 style="margin:0 0 0.5rem 0; font-size:0.95rem; color:#fff;">Reactions &amp; Event Gating Matrix</h4>
+      <div style="overflow-x:auto;">
+        <table class="data-table" style="font-size:0.78rem;">
+          <thead>
+            <tr>
+              <th>Trigger Concept</th>
+              <th>Trigger Action</th>
+              <th>Condition</th>
+              <th>Target Concept</th>
+              <th>Target Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% (blueprint.reactions_matrix || []).forEach(function(rx) { %>
+            <tr>
+              <td><%= rx.trigger_concept %></td>
+              <td><code><%= rx.trigger_action %></code></td>
+              <td style="color:#cbd5e1;"><%= rx.condition %></td>
+              <td><span class="badge badge-blue"><%= rx.target_concept %></span></td>
+              <td><code><%= rx.target_action %></code></td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ========================================================================= -->
+<!-- TAB 3: Section 6: Interactive 10-Scenario Simulation Lab                  -->
+<!-- ========================================================================= -->
+<div id="tab-simulation-lab" class="bp-tab-content" style="display:none;">
+
+  <div class="card" style="margin-bottom:1.5rem; border-top:4px solid #6366f1;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
+      <div>
+        <h3 style="margin:0; font-size:1.15rem; color:#fff;">6. Interactive Scenario Simulation Lab</h3>
+        <p style="margin:0.25rem 0 0 0; font-size:0.8rem; color:var(--muted);">
+          Execute any of the 10 core operational scenarios through the state engine. Observe live state transitions, gating rules, strike counts, and human-in-the-loop triggers.
+        </p>
+      </div>
+      <span class="badge badge-green" style="font-weight:700;">10 OPERATIONAL SCENARIOS COMPILED</span>
+    </div>
+
+    <!-- Quick Scenario Selector Buttons -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:0.5rem; margin-bottom:1.25rem;">
+      <% (blueprint.scenarios || []).forEach(function(sc) { %>
+      <form method="POST" style="margin:0;">
+        <input type="hidden" name="action" value="run_simulation">
+        <input type="hidden" name="scenario_id" value="<%= sc.id %>">
+        <button type="submit" class="btn btn-secondary btn-full btn-sm" style="text-align:left; padding:0.6rem 0.75rem; height:100%; display:flex; flex-direction:column; justify-content:space-between; gap:0.25rem; <%= (typeof selectedScenarioId !== 'undefined' && selectedScenarioId === sc.id) ? 'border-color:#6366f1; background:rgba(99,102,241,0.15);' : '' %>">
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+            <strong style="color:#fff; font-size:0.75rem;">Scenario <%= sc.id %></strong>
+            <span class="badge badge-blue" style="font-size:0.6rem;"><%= sc.category.substring(0, 16) %></span>
+          </div>
+          <div style="font-size:0.68rem; color:var(--muted); line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">
+            <%= sc.name.replace(/^Scenario \d+: /, '') %>
+          </div>
+          <div style="font-size:0.65rem; color:#10b981; font-weight:600; margin-top:0.2rem;">
+            Run Live ›
+          </div>
+        </button>
+      </form>
+      <% }); %>
+    </div>
+
+    <!-- Simulation Runner Form (Customizable input) -->
+    <div style="background:var(--bg-input); padding:1rem; border-radius:8px; border:1px solid var(--border); margin-bottom:1.5rem;">
+      <form method="POST" style="margin:0;">
+        <input type="hidden" name="action" value="run_simulation">
+        <div style="font-size:0.75rem; font-weight:600; color:#818cf8; text-transform:uppercase; margin-bottom:0.75rem;">
+          Configure &amp; Execute Simulation
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.75rem; margin-bottom:0.75rem;">
+          <div>
+            <label class="form-label" style="font-size:0.72rem;">Target Scenario</label>
+            <select name="scenario_id" class="form-control" style="font-size:0.8rem;">
+              <% (blueprint.scenarios || []).forEach(function(sc) { %>
+                <option value="<%= sc.id %>" <%= (typeof selectedScenarioId !== 'undefined' && selectedScenarioId === sc.id) ? 'selected' : '' %>>
+                  Scenario <%= sc.id %>: <%= sc.name.substring(0, 48) %>...
+                </option>
+              <% }); %>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.72rem;">Test Username</label>
+            <input type="text" name="test_username" class="form-control" placeholder="e.g. sim_alex" value="<%= (typeof simulation_result !== 'undefined' && simulation_result) ? simulation_result.user_state.username : 'sim_alex' %>">
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.72rem;">Test Email</label>
+            <input type="email" name="test_email" class="form-control" placeholder="alex@gmail.com" value="<%= (typeof simulation_result !== 'undefined' && simulation_result) ? simulation_result.user_state.email : 'alex@learnami-test.org' %>">
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.72rem;">Age / Location</label>
+            <div style="display:flex; gap:0.5rem;">
+              <input type="number" name="test_age" class="form-control" placeholder="Age" value="21" style="width:70px;">
+              <input type="text" name="test_location" class="form-control" placeholder="Loc (US)" value="US">
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-size:0.72rem; color:var(--muted);">
+            Simulation runs against in-memory state engine, dispatches live SMTP report if configured, and updates audit records.
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="background:#6366f1;">
+            ⚡ Run State Machine Simulation
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Active Simulation Results Display -->
+    <% if (typeof simulation_result !== 'undefined' && simulation_result) { %>
+      <div style="border:1px solid #6366f1; border-radius:8px; padding:1.25rem; background:linear-gradient(180deg, rgba(99,102,241,0.08) 0%, rgba(15,17,23,0.95) 100%); margin-bottom:1.5rem;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid rgba(99,102,241,0.25); padding-bottom:0.75rem;">
+          <div>
+            <div style="display:inline-flex; align-items:center; gap:0.4rem; margin-bottom:0.25rem;">
+              <span class="badge badge-green">EXECUTION SUCCESSFUL</span>
+              <span class="badge badge-blue">Duration: <%= simulation_result.duration_ms %>ms</span>
+              <span class="badge badge-gray"><%= simulation_result.executed_at %></span>
+            </div>
+            <h4 style="margin:0; font-size:1.05rem; color:#fff;">
+              <%= simulation_result.scenario_name %>
+            </h4>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:0.7rem; color:var(--muted); text-transform:uppercase;">Resulting System State</div>
+            <div style="font-size:0.95rem; font-weight:700; color:#10b981;">
+              <%= simulation_result.expected_outcome %>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulated User State Telemetry Cards -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:0.6rem; margin-bottom:1.25rem;">
+          <div style="background:var(--bg-input); padding:0.6rem 0.8rem; border-radius:6px; border:1px solid var(--border);">
+            <div style="font-size:0.65rem; color:var(--muted); text-transform:uppercase;">User &amp; Email</div>
+            <div style="font-size:0.8rem; font-weight:600; color:#fff;"><%= simulation_result.user_state.username %></div>
+            <div style="font-size:0.7rem; color:#94a3b8;"><%= simulation_result.user_state.email %></div>
+          </div>
+          <div style="background:var(--bg-input); padding:0.6rem 0.8rem; border-radius:6px; border:1px solid var(--border);">
+            <div style="font-size:0.65rem; color:var(--muted); text-transform:uppercase;">Registration Status</div>
+            <div style="font-size:0.85rem; font-weight:600; color:<%= simulation_result.user_state.registration_status === 'Approved' ? '#10b981' : '#f59e0b' %>;">
+              <%= simulation_result.user_state.registration_status %>
+            </div>
+            <div style="font-size:0.7rem; color:var(--muted);">Token: <%= simulation_result.user_state.token_expiry_minutes %></div>
+          </div>
+          <div style="background:var(--bg-input); padding:0.6rem 0.8rem; border-radius:6px; border:1px solid var(--border);">
+            <div style="font-size:0.65rem; color:var(--muted); text-transform:uppercase;">Onboarding Stage</div>
+            <div style="font-size:0.85rem; font-weight:600; color:#fff;">
+              <%= simulation_result.user_state.onboarding_stage %>
+            </div>
+            <div style="font-size:0.7rem; color:var(--muted);"><%= simulation_result.user_state.quokka_notice %></div>
+          </div>
+          <div style="background:var(--bg-input); padding:0.6rem 0.8rem; border-radius:6px; border:1px solid var(--border);">
+            <div style="font-size:0.65rem; color:var(--muted); text-transform:uppercase;">Verification Standing</div>
+            <div style="font-size:0.85rem; font-weight:700; color:<%= simulation_result.user_state.verification_status.includes('Verified') ? '#10b981' : (simulation_result.user_state.verification_status.includes('Blocked') ? '#ef4444' : '#f59e0b') %>;">
+              <%= simulation_result.user_state.verification_status %>
+            </div>
+            <div style="font-size:0.7rem; color:var(--muted);">Role: <%= simulation_result.user_state.assigned_role %></div>
+          </div>
+          <div style="background:var(--bg-input); padding:0.6rem 0.8rem; border-radius:6px; border:1px solid var(--border);">
+            <div style="font-size:0.65rem; color:var(--muted); text-transform:uppercase;">Strikes &amp; Probation</div>
+            <div style="font-size:0.85rem; font-weight:700; color:<%= simulation_result.user_state.strikes_count >= 3 ? '#ef4444' : '#fff' %>;">
+              Strikes: <%= simulation_result.user_state.strikes_count %> / 3
+            </div>
+            <div style="font-size:0.7rem; color:#94a3b8;"><%= simulation_result.user_state.probation_successes %></div>
+          </div>
+        </div>
+
+        <!-- Trace Execution Timeline -->
+        <div>
+          <div style="font-size:0.75rem; font-weight:600; color:#818cf8; text-transform:uppercase; margin-bottom:0.5rem;">
+            Step-by-Step State Machine Transition Trace (<%= simulation_result.trace.length %> steps)
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="data-table" style="font-size:0.76rem;">
+              <thead>
+                <tr>
+                  <th style="width:5%;">#</th>
+                  <th style="width:18%;">Concept</th>
+                  <th style="width:35%;">Action Executed</th>
+                  <th style="width:22%;">Trigger Condition</th>
+                  <th style="width:20%;">Recorded Outcome</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% simulation_result.trace.forEach(function(tr) { %>
+                <tr>
+                  <td><code><%= tr.index %></code></td>
+                  <td><span class="badge badge-blue" style="font-size:0.68rem;"><%= tr.concept %></span></td>
+                  <td><strong><%= tr.action %></strong></td>
+                  <td style="color:#94a3b8;"><%= tr.trigger %></td>
+                  <td>
+                    <span class="badge <%= tr.outcome.includes('works') || tr.outcome.includes('resolved') ? 'badge-green' : 'badge-amber' %>" style="font-size:0.68rem;">
+                      <%= tr.outcome %>
+                    </span>
+                  </td>
+                </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     <% } %>
+
+    <!-- All 10 Scenarios Reference Cards -->
+    <div>
+      <div style="font-size:0.8rem; font-weight:600; color:#fff; margin-bottom:0.75rem;">
+        Complete Catalog of 10 Evaluated System Scenarios
+      </div>
+      <div style="display:flex; flex-direction:column; gap:0.75rem;">
+        <% (blueprint.scenarios || []).forEach(function(sc) { %>
+        <details style="border:1px solid var(--border); border-radius:6px; background:var(--bg-input); padding:0.6rem 0.9rem;" <%= (typeof selectedScenarioId !== 'undefined' && selectedScenarioId === sc.id) ? 'open' : '' %>>
+          <summary style="cursor:pointer; font-weight:600; color:#fff; font-size:0.82rem; display:flex; justify-content:space-between; align-items:center;">
+            <span><%= sc.name %></span>
+            <div style="display:inline-flex; gap:0.4rem; align-items:center;">
+              <span class="badge badge-gray" style="font-size:0.65rem;"><%= sc.category %></span>
+              <span class="badge badge-green" style="font-size:0.65rem;"><%= sc.steps.length %> steps</span>
+            </div>
+          </summary>
+          <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border);">
+            <p style="font-size:0.78rem; color:#cbd5e1; margin-bottom:0.6rem;">
+              <%= sc.description %>
+            </p>
+            <div style="font-size:0.74rem; color:#10b981; font-weight:600; margin-bottom:0.6rem;">
+              Target Resolution: <%= sc.expected_outcome %>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table" style="font-size:0.72rem;">
+                <thead>
+                  <tr>
+                    <th>Step</th>
+                    <th>Concept</th>
+                    <th>Action</th>
+                    <th>Trigger</th>
+                    <th>Outcome</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% sc.steps.forEach(function(st) { %>
+                  <tr>
+                    <td><%= st.step %></td>
+                    <td><code><%= st.concept %></code></td>
+                    <td><%= st.action %></td>
+                    <td style="color:#94a3b8;"><%= st.trigger %></td>
+                    <td><span class="badge badge-blue"><%= st.outcome %></span></td>
+                  </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+        <% }); %>
+      </div>
+    </div>
+
   </div>
+
 </div>
 
-<div class="grid grid-2" style="margin-top:1.5rem; display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
-  <div class="card">
-    <h3 style="margin-top:0;">Deployment &amp; Security Zones</h3>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Zone</th>
-          <th>Implementation Context</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% if (blueprint && blueprint.deployment_zones) { %>
-          <% Object.keys(blueprint.deployment_zones).forEach(function(zoneName) { %>
-          <tr>
-            <td><code><%= zoneName %></code></td>
-            <td><%= blueprint.deployment_zones[zoneName] %></td>
-          </tr>
-          <% }); %>
-        <% } %>
-      </tbody>
-    </table>
+<!-- ========================================================================= -->
+<!-- TAB 4: Architecture Zones, Consolidated Blocks & Snapshots                -->
+<!-- ========================================================================= -->
+<div id="tab-deployment-zones" class="bp-tab-content" style="display:none;">
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin-top:0; font-size:1.1rem; color:#fff;">5 Consolidated Architectural Blocks</h3>
+    <div class="grid grid-2" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+      <% if (blueprint && blueprint.consolidated_blocks) { %>
+        <% blueprint.consolidated_blocks.forEach(function(block) { %>
+        <div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:var(--bg-input);">
+          <h4 style="margin:0 0 0.5rem 0; color:var(--accent); font-size:0.9rem;"><%= block.name %></h4>
+          <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+            <% (block.components || []).forEach(function(comp) { %>
+            <span class="badge badge-blue" style="font-size:0.72rem;"><%= comp %></span>
+            <% }); %>
+          </div>
+        </div>
+        <% }); %>
+      <% } %>
+    </div>
   </div>
 
-  <div class="card">
-    <h3 style="margin-top:0;">Blueprint Snapshots Audit Log</h3>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Snapshot Name</th>
-          <th>Created At</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% if (snapshots && snapshots.length > 0) { %>
-          <% snapshots.forEach(function(s) { %>
+  <div class="grid grid-2" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem;">
+    <div class="card">
+      <h3 style="margin-top:0; font-size:1.05rem; color:#fff;">Deployment &amp; Security Zones</h3>
+      <table class="data-table" style="font-size:0.8rem;">
+        <thead>
           <tr>
-            <td>#<%= s.id %></td>
-            <td><code><%= s.snapshot_name %></code></td>
-            <td><%= s.created_at %></td>
+            <th>Zone</th>
+            <th>Implementation Context</th>
           </tr>
-          <% }); %>
-        <% } else { %>
-          <tr><td colspan="3" style="text-align:center;">No snapshots saved.</td></tr>
-        <% } %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <% if (blueprint && blueprint.deployment_zones) { %>
+            <% Object.keys(blueprint.deployment_zones).forEach(function(zoneName) { %>
+            <tr>
+              <td><code><%= zoneName %></code></td>
+              <td style="color:#cbd5e1;"><%= blueprint.deployment_zones[zoneName] %></td>
+            </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <h3 style="margin:0; font-size:1.05rem; color:#fff;">Blueprint Snapshots Audit Log</h3>
+        <form method="POST" style="margin:0;">
+          <input type="hidden" name="action" value="take_snapshot">
+          <button type="submit" class="btn btn-secondary btn-sm">Capture Now</button>
+        </form>
+      </div>
+      <table class="data-table" style="font-size:0.8rem;">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Snapshot Name</th>
+            <th>Created At</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (snapshots && snapshots.length > 0) { %>
+            <% snapshots.forEach(function(s) { %>
+            <tr>
+              <td>#<%= s.id %></td>
+              <td><code><%= s.snapshot_name %></code></td>
+              <td style="color:var(--muted);"><%= s.created_at %></td>
+            </tr>
+            <% }); %>
+          <% } else { %>
+            <tr><td colspan="3" style="text-align:center;">No snapshots saved.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
   </div>
+
 </div>
+
+<!-- Client-side Tab Switching Script -->
+<script>
+  function switchBpTab(tabId, btn) {
+    document.querySelectorAll('.bp-tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.bp-tab-btn').forEach(el => {
+      el.classList.remove('active');
+      el.style.background = '';
+      el.style.color = '';
+    });
+
+    const target = document.getElementById('tab-' + tabId);
+    if (target) {
+      target.style.display = 'block';
+    }
+    if (btn) {
+      btn.classList.add('active');
+    }
+  }
+
+  // Auto-switch to simulation tab if a simulation was just executed
+  <% if (typeof simulation_result !== 'undefined' && simulation_result) { %>
+    document.addEventListener('DOMContentLoaded', function() {
+      const simTabBtn = document.querySelectorAll('.bp-tab-btn')[2];
+      if (simTabBtn) {
+        switchBpTab('simulation-lab', simTabBtn);
+      }
+    });
+  <% } %>
+</script>
+
+<style>
+  .bp-tab-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .bp-tab-btn:hover {
+    color: var(--text);
+    border-color: #6366f1;
+  }
+  .bp-tab-btn.active {
+    background: #6366f1 !important;
+    color: #fff !important;
+    border-color: #6366f1 !important;
+  }
+</style>
 
 <%- include('footer') %>

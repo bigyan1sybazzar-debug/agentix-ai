@@ -4,6 +4,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import mysql from 'mysql2/promise';
 import nodemailer from 'nodemailer';
+import { agentDesignBlueprint, executeScenarioSimulation } from './agentDesignBlueprint.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,11 +30,11 @@ const SMTP_CONFIG_FILE = path.join(__dirname, 'smtp_config.json');
 // Global DB config with defaults
 let dbConfig = {
   ENGINE: 'mysql',
-  HOST: '162.241.224.185',
-  PORT: '3306',
-  NAME: 'learnami_ttest',
-  USER: 'learnami_ttest',
-  PASSWORD: ''
+  HOST: process.env.DB_HOST || '162.241.224.185',
+  PORT: process.env.DB_PORT || '3306',
+  NAME: process.env.DB_NAME || 'learnami_ttest',
+  USER: process.env.DB_USER || 'learnami_ttest',
+  PASSWORD: process.env.DB_PASSWORD || ''
 };
 
 // Load saved DB config if exists
@@ -56,13 +57,13 @@ function saveDbConfig(cfg) {
 
 // Global SMTP config
 let smtpConfig = {
-  host: 'mail.appflicks.com',
-  port: 465,
-  secure: true,
-  user: 'test@appflicks.com',
-  pass: '',
+  host: process.env.SMTP_HOST || 'mail.appflicks.com',
+  port: parseInt(process.env.SMTP_PORT || '465', 10),
+  secure: (process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) === 465 : true),
+  user: process.env.SMTP_USER || 'test@appflicks.com',
+  pass: process.env.SMTP_PASS || '',
   from: '"AppFlicks Automation" <test@appflicks.com>',
-  recipient: 'test@appflicks.com',
+  recipient: process.env.SMTP_RECIPIENT || 'test@appflicks.com',
   notify_on_batch: true,
   notify_on_block: true,
   enabled: true
@@ -387,21 +388,7 @@ let runbookExecutions = [
   { id: 1, runbook_key: 'policy_error_healing', triggered_by: 'system_auto_orchestrator', status: 'completed', steps_completed: ['step 1', 'step 2', 'step 3', 'step 4'], created_at: new Date(Date.now() - 7200000).toISOString().replace('T', ' ').substring(0, 19) }
 ];
 
-let blueprint = {
-  consolidated_blocks: [
-    { name: '1. Ingestion & Onboarding Layer', components: ['WordPress Remote DB Connector', 'Registration Rules', 'Disposable Email Filter', 'Progressive Asks', 'Role Progression'] },
-    { name: '2. Participation & Moderation Layer', components: ['Keyword Filter', 'Moderation Queue', 'Reason Codes (SPAM, HARASSMENT)', 'Case Resolver'] },
-    { name: '3. Governance & Policy Engine', components: ['Multi-SFP Capability Packs', 'DB-driven Policy Rules', 'Audit Logs', 'Simulation Sandbox'] },
-    { name: '4. Identity & Vector Memory RAG', components: ['Candidate Scoring', 'Cross-site Linking', 'Semantic Retrieval', 'Vector Embedding'] },
-    { name: '5. Media Assistant & Automation', components: ['TMDB Validator', 'WP Packaging', 'Provenance Ledger', 'Master Self-Automation'] }
-  ],
-  deployment_zones: {
-    'Zone A (Edge Ingestion)': 'Client web interface, rate limiter, lightweight input sanitizer.',
-    'Zone B (Agent Governance Core)': 'Policy execution engine, audit ledger, role access checks.',
-    'Zone C (Vector Memory / Storage)': 'In-memory semantic vector store, document repository, cached embeddings.',
-    'Zone D (Operational Runbooks)': 'Self-healing worker processes, batch runners, automated queue drains.'
-  }
-};
+let blueprint = agentDesignBlueprint;
 
 let blueprintSnapshots = [
   { id: 1, snapshot_name: 'initial_deployment_v1', created_at: new Date().toISOString().replace('T', ' ').substring(0, 19) }
@@ -2193,32 +2180,64 @@ app.post('/runbooks/', (req, res) => {
 });
 
 // ==========================================
-// Production Blueprint
+// Production Blueprint & Simulation Engine
 // ==========================================
 app.get('/blueprint/', (req, res) => {
+  const scenarioId = req.query.scenario ? parseInt(req.query.scenario, 10) : 1;
+  const initialSim = req.query.auto_run === '1' ? executeScenarioSimulation(scenarioId) : null;
+
   res.render('blueprint', {
-    title: 'Production Blueprint | Learnami',
+    title: 'Your Agent Design Blueprint | Learnami',
     activeNav: 'blueprint',
     blueprint,
-    snapshots: blueprintSnapshots
+    snapshots: blueprintSnapshots,
+    selectedScenarioId: scenarioId,
+    simulation_result: initialSim
   });
 });
 
 app.post('/blueprint/', (req, res) => {
-  const sname = req.body.snapshot_name || `blueprint_snapshot_${blueprintSnapshots.length + 1}`;
-  blueprintSnapshots.unshift({
-    id: blueprintSnapshots.length + 1,
-    snapshot_name: sname,
-    created_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
-  });
-  res.locals.messages = [{ tags: 'success', text: `Blueprint snapshot '${sname}' created successfully.` }];
+  const action = req.body.action || (req.body.snapshot_name ? 'take_snapshot' : 'run_simulation');
+  let simResult = null;
+  let selectedScenarioId = 1;
+
+  if (action === 'run_simulation') {
+    selectedScenarioId = parseInt(req.body.scenario_id || '1', 10);
+    simResult = executeScenarioSimulation(selectedScenarioId, {
+      username: req.body.test_username,
+      email: req.body.test_email,
+      age: req.body.test_age ? parseInt(req.body.test_age, 10) : undefined,
+      location: req.body.test_location
+    });
+
+    res.locals.messages = [{
+      tags: 'success',
+      text: `⚡ Executed simulation for Scenario ${selectedScenarioId}: "${simResult.scenario_name}" — Outcome: ${simResult.expected_outcome}`
+    }];
+  } else if (action === 'take_snapshot') {
+    const sname = req.body.snapshot_name || `blueprint_snapshot_${blueprintSnapshots.length + 1}`;
+    blueprintSnapshots.unshift({
+      id: blueprintSnapshots.length + 1,
+      snapshot_name: sname,
+      created_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
+    });
+    res.locals.messages = [{ tags: 'success', text: `Blueprint snapshot '${sname}' created successfully.` }];
+  }
 
   res.render('blueprint', {
-    title: 'Production Blueprint | Learnami',
+    title: 'Your Agent Design Blueprint | Learnami',
     activeNav: 'blueprint',
     blueprint,
-    snapshots: blueprintSnapshots
+    snapshots: blueprintSnapshots,
+    selectedScenarioId,
+    simulation_result: simResult
   });
+});
+
+app.post('/api/blueprint/simulate/', (req, res) => {
+  const scenarioId = parseInt(req.body.scenario_id || '1', 10);
+  const result = executeScenarioSimulation(scenarioId, req.body);
+  res.json(result);
 });
 
 // ==========================================
