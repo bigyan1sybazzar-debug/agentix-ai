@@ -627,10 +627,51 @@ function evaluateRegistration(username, email, wpid = null) {
     assigned_role = 'subscriber_probationary';
   }
 
+  let classification = 'VERIFIED_HUMAN';
+  let classification_label = '🛡️ Verified Human Account';
+  let diagnostic_summary = 'Clean registration signature on verified consumer or telecom domain. Zero automated bot patterns.';
+
+  if (wpid === 1 || String(wpid) === '1' || unameLower === 'ronvining' || emailLower === 'ronvining@gmail.com') {
+    classification = 'ADMIN_OFFICIAL';
+    classification_label = '👑 Site Owner / Primary Administrator';
+    diagnostic_summary = 'Primary WordPress site administrator account (WP ID #1). Permanent immunity from automated restrictions.';
+  } else if (domain === 'appflicks.com' || domain === 'learnami.com') {
+    classification = 'ADMIN_OFFICIAL';
+    classification_label = '👑 Official Platform Brand / Staff';
+    diagnostic_summary = 'Official platform brand domain (@' + domain + '). Verified staff / platform identity.';
+  } else if (reasons.includes('chaos_case_bot_generator_token')) {
+    classification = 'CHAOS_CASE_BOT';
+    classification_label = '🚨 Automated Bot Machine Token';
+    diagnostic_summary = 'Username exhibits machine-generated chaos casing (interleaved irregular uppercase and lowercase characters). Typical of automated registration scripts.';
+  } else if (reasons.includes('embedded_digits_bot_pattern')) {
+    classification = 'EMBEDDED_DIGITS_BOT';
+    classification_label = '🤖 Bot Generator Pattern';
+    diagnostic_summary = 'Username contains digits embedded inside multiple random consonant clusters, characteristic of automated account farm generators.';
+  } else if (reasons.some(r => r.startsWith('disposable_spam_domain'))) {
+    classification = 'DISPOSABLE_MAIL_FARM';
+    classification_label = '🚫 Disposable Burner Email / Bot Subdomain';
+    diagnostic_summary = 'Domain (' + domain + ') is a confirmed temporary burner inbox or automated bot-farm subdomain.';
+  } else if (reasons.some(r => r.startsWith('high_risk_tld'))) {
+    classification = 'SPAM_TLD';
+    classification_label = '⚠️ High-Risk Spam TLD';
+    diagnostic_summary = 'Top-level domain (.' + domain.split('.').pop() + ') has elevated fraud and automated spam volume.';
+  } else if (reasons.some(r => r.startsWith('spam_keyword'))) {
+    classification = 'SPAM_KEYWORD';
+    classification_label = '⛔ Blacklisted Spam Keyword';
+    diagnostic_summary = 'Account name or email matched commercial blacklisted spam patterns (e.g. gambling, SEO, casino).';
+  } else if (reasons.some(r => r.startsWith('unverified_custom_domain'))) {
+    classification = 'SUPERVISED_CUSTOM_DOMAIN';
+    classification_label = '⏳ Supervised Custom / Business Domain';
+    diagnostic_summary = 'Domain (' + domain + ') is an unverified private or corporate domain. Placed in Supervised Probation pending identity confirmation (safe, not blocked).';
+  }
+
   return {
     evaluation_status,
     risk_score: Math.min(risk_score, 1.0),
     risk_reasons: reasons.join(', '),
+    classification,
+    classification_label,
+    diagnostic_summary,
     onboarding_stage,
     assigned_role
   };
@@ -693,17 +734,16 @@ async function attemptRealMysqlSync(cfg) {
             uname.toLowerCase() === 'administrator' ||
             (smtpConfig.recipient && uemail.toLowerCase() === smtpConfig.recipient.toLowerCase());
 
-          // Check if database marks this user as blocked/locked (Admins are immune!)
-          const isDbBlocked = !isAdmin && (
-            (r.user_status && Number(r.user_status) !== 0) ||
-            (r.user_activation_key && r.user_activation_key.includes('BLOCKED')) ||
+          // Check if database specifically marks this user as explicitly blocked by admin
+          const isExplicitlyBlocked = !isAdmin && (
+            (r.user_activation_key && r.user_activation_key.includes('BLOCKED_PURGED')) ||
             (r.user_pass && r.user_pass.startsWith('$BLOCKED_'))
           );
 
-          const assigned_role = isAdmin ? 'administrator' : (isDbBlocked ? 'restricted_blocked' : evalRes.assigned_role);
-          const evaluation_status = isAdmin ? 'approved' : (isDbBlocked ? 'rejected' : evalRes.evaluation_status);
-          const onboarding_stage = isAdmin ? 'completed' : (isDbBlocked ? 'escalated' : evalRes.onboarding_stage);
-          const risk_score = isAdmin ? 0.00 : (isDbBlocked ? 0.95 : evalRes.risk_score);
+          const assigned_role = isAdmin ? 'administrator' : (isExplicitlyBlocked ? 'restricted_blocked' : evalRes.assigned_role);
+          const evaluation_status = isAdmin ? 'approved' : (isExplicitlyBlocked ? 'rejected' : evalRes.evaluation_status);
+          const onboarding_stage = isAdmin ? 'completed' : (isExplicitlyBlocked ? 'escalated' : evalRes.onboarding_stage);
+          const risk_score = isAdmin ? 0.00 : (isExplicitlyBlocked ? 0.95 : evalRes.risk_score);
 
           return {
             id: wpid,
@@ -719,6 +759,10 @@ async function attemptRealMysqlSync(cfg) {
             onboarding_stage,
             evaluation_status,
             risk_score,
+            classification: evalRes.classification,
+            classification_label: evalRes.classification_label,
+            diagnostic_summary: evalRes.diagnostic_summary,
+            risk_reasons: evalRes.risk_reasons,
             can_post: isAdmin || assigned_role.includes('trusted'),
             can_comment: isAdmin || !assigned_role.includes('blocked'),
             can_vote: true,
@@ -2154,6 +2198,64 @@ app.post('/onboarding/', async (req, res) => {
       res.locals.messages = [{
         tags: 'warning',
         text: `⚠️ User #${uid} could not be found in memory or live WordPress database. Verify the user ID.`
+      }];
+    }
+  } else if (action === 'reevaluate_all_users') {
+    let trustedCount = 0;
+    let probationaryCount = 0;
+    let blockedCount = 0;
+
+    for (const u of users) {
+      const evalRes = evaluateRegistration(u.username, u.email, u.wp_user_id || u.id);
+      u.risk_score = evalRes.risk_score;
+      u.assigned_role = evalRes.assigned_role;
+      u.evaluation_status = evalRes.evaluation_status;
+      u.onboarding_stage = evalRes.onboarding_stage;
+      u.risk_reasons = evalRes.risk_reasons;
+      u.classification = evalRes.classification;
+      u.classification_label = evalRes.classification_label;
+      u.diagnostic_summary = evalRes.diagnostic_summary;
+      u.can_post = evalRes.assigned_role.includes('trusted') || evalRes.assigned_role === 'administrator';
+      u.can_comment = !evalRes.assigned_role.includes('blocked');
+
+      if (evalRes.assigned_role.includes('trusted') || evalRes.assigned_role === 'administrator') trustedCount++;
+      else if (evalRes.assigned_role.includes('probationary')) probationaryCount++;
+      else blockedCount++;
+    }
+
+    fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
+
+    // Sync to MySQL in background
+    if (dbConfig.USER && dbConfig.PASSWORD) {
+      executeDatabaseAutomationAndNotify(users, false).catch(err => console.warn('[REEVAL DB SYNC]:', err.message));
+    }
+
+    res.locals.messages = [{
+      tags: 'success',
+      text: `✓ Deep Heuristic Re-Evaluation Complete for all ${users.length} user accounts! Analysis: ${trustedCount} Verified Humans / Official Brand (${((trustedCount/users.length)*100).toFixed(0)}%), ${probationaryCount} Supervised Custom Domains (${((probationaryCount/users.length)*100).toFixed(0)}%), and ${blockedCount} Confirmed Spam Bots / Burner Domains (${((blockedCount/users.length)*100).toFixed(0)}%).`
+    }];
+  } else if (action === 'reevaluate_single_user') {
+    const uid = parseInt(req.body.user_id, 10);
+    const u = users.find(user => user.id === uid || user.wp_user_id === uid);
+    if (u) {
+      const evalRes = evaluateRegistration(u.username, u.email, u.wp_user_id || u.id);
+      u.risk_score = evalRes.risk_score;
+      u.assigned_role = evalRes.assigned_role;
+      u.evaluation_status = evalRes.evaluation_status;
+      u.onboarding_stage = evalRes.onboarding_stage;
+      u.risk_reasons = evalRes.risk_reasons;
+      u.classification = evalRes.classification;
+      u.classification_label = evalRes.classification_label;
+      u.diagnostic_summary = evalRes.diagnostic_summary;
+      u.can_post = evalRes.assigned_role.includes('trusted') || evalRes.assigned_role === 'administrator';
+      u.can_comment = !evalRes.assigned_role.includes('blocked');
+
+      fs.writeFileSync(USERS_CACHE_FILE, JSON.stringify(users, null, 2), 'utf8');
+      const dbSync = await syncSingleUserToDatabase(u);
+
+      res.locals.messages = [{
+        tags: 'success',
+        text: `✓ User #${u.wp_user_id} (${u.username}) re-evaluated: [${evalRes.classification_label}]. Risk: ${(evalRes.risk_score * 100).toFixed(0)}% -> Role: '${evalRes.assigned_role}'. Database: ${dbSync.message}`
       }];
     }
   } else if (action === 'delete_user') {

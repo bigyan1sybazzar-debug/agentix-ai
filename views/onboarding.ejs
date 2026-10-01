@@ -181,6 +181,10 @@
           <span style="font-size:0.75rem; color:#93c5fd; font-weight:600;">
             (<span id="bulkSelectedCount">0</span> selected)
           </span>
+          <!-- Re-Evaluate All Users Button -->
+          <button type="button" class="btn btn-secondary btn-sm" style="border-color:#6366f1; color:#a5b4fc; font-weight:600; padding:2px 8px; font-size:0.72rem;" onclick="submitReevaluateAll(this)" title="Execute deep AI heuristic evaluation across every user in directory">
+            ⚡ Re-Evaluate All Users
+          </button>
         </div>
         <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
           <button type="submit" name="bulk_action" value="bulk_block_delete" class="btn btn-danger btn-sm" style="padding:3px 8px; font-size:0.72rem;" onclick="return confirm('Permanently delete all selected users from WordPress (8uI_users & 8uI_usermeta)?')">
@@ -224,6 +228,13 @@
                   <strong style="color:#fff;"><%= u.username %></strong>
                 </div>
                 <div style="font-size:0.72rem; color:var(--muted); margin-left:14px;"><%= u.email %></div>
+                <% if (u.classification_label) { %>
+                  <div style="margin-left:14px; margin-top:2px;">
+                    <span style="font-size:0.65rem; padding:1px 5px; border-radius:3px; background:rgba(255,255,255,0.06); color:<%= u.assigned_role.includes('trusted') ? '#6ee7b7' : (u.assigned_role.includes('blocked') ? '#fca5a5' : '#fde047') %>;">
+                      <%= u.classification_label %>
+                    </span>
+                  </div>
+                <% } %>
               </td>
               <td>
                 <span class="badge badge-<%= u.risk_score > 0.5 ? 'red' : (u.risk_score > 0.2 ? 'amber' : 'green') %>">
@@ -430,8 +441,11 @@
 
       <!-- Risk Diagnostics Breakdown -->
       <div style="margin-bottom:1.25rem;">
-        <div style="font-size:0.75rem; font-weight:600; color:#fff; margin-bottom:0.35rem;">Risk Heuristics Evaluation:</div>
-        <div id="modal-risk-details" style="font-size:0.78rem; color:var(--muted); background:#0c0e14; padding:0.75rem; border-radius:6px; border:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+          <div style="font-size:0.75rem; font-weight:600; color:#fff;">Risk Heuristics Evaluation:</div>
+          <span id="modal-classification-badge" class="badge badge-green" style="font-size:0.72rem; padding:2px 8px;">🛡️ Verified Human Account</span>
+        </div>
+        <div id="modal-risk-details" style="font-size:0.78rem; color:var(--muted); background:#0c0e14; padding:0.75rem; border-radius:6px; border:1px solid var(--border); line-height:1.5;">
           Verified domain. No spam signatures detected. Standard consumer ISP routing.
         </div>
       </div>
@@ -458,6 +472,9 @@
           </button>
           <button type="submit" name="new_role" value="restricted_blocked" class="btn btn-danger btn-sm" title="Permanently delete from WordPress and email notice">
             🚫 Block &amp; Delete from WP
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="reevaluateCurrentModalUser(this)" style="color:#a5b4fc; border-color:rgba(165,180,252,0.4);" title="Re-evaluate this user using deep AI heuristics">
+            ⚡ Re-Evaluate User
           </button>
         </div>
       </form>
@@ -533,15 +550,56 @@ function inspectUserRow(userId) {
   const permComment = document.getElementById('perm-comment');
   permComment.innerHTML = user.can_comment ? '<span style="color:#10b981;">✓ Post Comments</span>' : '<span style="color:#ef4444;">✗ Comments Restricted</span>';
 
+  // Classification Badge
+  const classBadge = document.getElementById('modal-classification-badge');
+  const classLabel = user.classification_label || (
+    user.assigned_role === 'administrator' ? '👑 Site Owner / Primary Administrator' :
+    (user.assigned_role.includes('trusted') ? '🛡️ Verified Human Account' :
+    (user.assigned_role.includes('blocked') ? '🚨 Automated Bot Machine Token' : '⏳ Supervised Custom Domain'))
+  );
+  if (classBadge) {
+    classBadge.innerText = classLabel;
+    classBadge.className = 'badge ' + (
+      user.assigned_role === 'administrator' ? 'badge-blue' :
+      (user.assigned_role.includes('trusted') ? 'badge-green' :
+      (user.assigned_role.includes('blocked') ? 'badge-red' : 'badge-amber'))
+    );
+  }
+
   // Risk diagnostics
   const detailsEl = document.getElementById('modal-risk-details');
-  if (user.assigned_role.includes('blocked') || user.risk_score > 0.5) {
-    detailsEl.innerHTML = '<span style="color:#ef4444;">⚠️ High risk detected:</span> Disposable email pattern or blacklisted bot keyword identified. Automated block applied.';
-  } else if (user.assigned_role.includes('probationary')) {
-    detailsEl.innerHTML = '<span style="color:#f59e0b;">⏳ Progressive asks required:</span> Email verification and avatar upload pending before elevated role is granted.';
-  } else {
-    detailsEl.innerHTML = '<span style="color:#10b981;">✓ Clean registration signature:</span> Standard consumer domain verified. Zero spam signals. Full trusted rights active.';
-  }
+  const emailDomain = (user.email && user.email.includes('@')) ? user.email.split('@')[1] : 'unknown';
+  const reasonsText = user.risk_reasons || (user.risk_score > 0.5 ? 'Automated bot generator signature or disposable domain' : 'Clean verification profile on recognized domain');
+  const summaryText = user.diagnostic_summary || (
+    user.assigned_role === 'administrator' ? 'Primary WordPress site administrator account (WP ID #1). Permanent immunity from automated restrictions.' :
+    (user.assigned_role.includes('trusted') ? `Legitimate registration signature on verified provider (${emailDomain}). Full rights active.` :
+    (user.assigned_role.includes('blocked') ? `High-risk bot signature detected. Account quarantined / purged from live WordPress.` :
+    `Unverified custom domain (${emailDomain}). Placed in supervised onboarding before granting full rights.`))
+  );
+
+  detailsEl.innerHTML = `
+    <div style="margin-bottom:6px;">
+      <strong style="color:#fff;">Account Assessment:</strong>
+      <span style="color:${user.assigned_role.includes('trusted') ? '#10b981' : (user.assigned_role.includes('blocked') ? '#ef4444' : '#f59e0b')}; font-weight:600;">
+        ${classLabel}
+      </span>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:6px; font-size:0.75rem;">
+      <div style="background:rgba(255,255,255,0.03); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.06);">
+        <span style="color:var(--muted);">Domain:</span> <code style="color:#93c5fd;">${emailDomain}</code>
+      </div>
+      <div style="background:rgba(255,255,255,0.03); padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,0.06);">
+        <span style="color:var(--muted);">Username:</span> <code style="color:#93c5fd;">${user.username}</code>
+      </div>
+    </div>
+    <div style="margin-bottom:6px; font-size:0.74rem;">
+      <span style="color:var(--muted);">Identified Factors:</span>
+      <span style="color:#f1f5f9;">${reasonsText}</span>
+    </div>
+    <div style="padding-top:6px; border-top:1px dashed rgba(255,255,255,0.1); color:#94a3b8; font-size:0.74rem; line-height:1.4;">
+      💡 <strong>Diagnostic Summary:</strong> ${summaryText}
+    </div>
+  `;
 
   // Set form inputs
   document.getElementById('modal-input-user-id').value = user.id;
@@ -614,6 +672,34 @@ function submitSingleAction(userId, actionName, newRole, btnElement) {
 
   document.body.appendChild(form);
   form.submit();
+}
+
+function submitReevaluateAll(btn) {
+  if (!confirm('Run Deep AI Heuristic Re-Evaluation on all user accounts in the directory?')) return;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Evaluating All...';
+  }
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/onboarding/';
+  const actInp = document.createElement('input');
+  actInp.type = 'hidden';
+  actInp.name = 'action';
+  actInp.value = 'reevaluate_all_users';
+  form.appendChild(actInp);
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function reevaluateCurrentModalUser(btn) {
+  const uid = document.getElementById('modal-input-user-id').value;
+  if (!uid) return;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Evaluating...';
+  }
+  submitSingleAction(uid, 'reevaluate_single_user', null, btn);
 }
 </script>
 
