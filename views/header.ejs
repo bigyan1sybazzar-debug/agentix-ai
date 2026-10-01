@@ -60,6 +60,8 @@
           <span class="icon">✉</span> SMTP &amp; Email
         </a>
 
+        <!-- Governance & Intelligence Section (Hidden) -->
+        <% if (false) { %>
         <span class="nav-section">Governance &amp; Intelligence</span>
         <a href="/moderation/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'moderation') ? 'active' : '' %>">
           <span class="icon">🛡️</span> Content Moderation
@@ -91,6 +93,7 @@
         <a href="/analytics/" class="nav-item <%= (typeof activeNav !== 'undefined' && activeNav === 'analytics') ? 'active' : '' %>">
           <span class="icon">📊</span> Analytics
         </a>
+        <% } %>
       </div>
 
       <div class="sidebar-footer">
